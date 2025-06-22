@@ -1,0 +1,4 @@
+# Ignora archivos de variables de entorno
+.env
+Credenciales/
+*.json
