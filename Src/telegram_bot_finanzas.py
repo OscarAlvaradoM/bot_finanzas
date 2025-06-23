@@ -341,7 +341,7 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in data:
         deudor = row["Deudor"]
         acreedor = row["Prestador"]
-        monto = float(row["Monto"])
+        monto = float(row["Monto"].replace('$', '').replace(',',''))
         balance.setdefault(deudor, {})
         balance.setdefault(acreedor, {})
         balance[deudor][acreedor] = balance[deudor].get(acreedor, 0) + monto
