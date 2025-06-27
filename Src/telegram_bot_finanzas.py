@@ -47,7 +47,7 @@ def init_gsheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(os.getenv("GOOGLE_CREDS_PATH"), scope)
     client = gspread.authorize(creds)
-    sheet = client.open("dineros_amigos").worksheet("Hoja1")
+    sheet = client.open("bd_amigos").worksheet("Hoja1")
     return sheet
 
 # -------------------------------
