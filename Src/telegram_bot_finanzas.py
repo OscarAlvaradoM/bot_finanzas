@@ -274,62 +274,6 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("Operación cancelada. ❌")
-    return ConversationHandler.END
-
-# async def editar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     query = update.callback_query
-#     await query.answer()
-
-#     keyboard = [
-#         [InlineKeyboardButton("Descripción 📝", callback_data="editar_descripcion")],
-#         [InlineKeyboardButton("Monto 💰", callback_data="editar_monto")],
-#         [InlineKeyboardButton("Pagador 👤", callback_data="editar_pagador")],
-#         [InlineKeyboardButton("Deudores 💸", callback_data="editar_deudores")],
-#         [InlineKeyboardButton("Método de pago 🏦", callback_data="editar_metodo")],
-#         [InlineKeyboardButton("Cancelar edición", callback_data="cancelar_edicion")],
-#     ]
-
-#     await query.edit_message_text(
-#         "¿Qué parte deseas editar?",
-#         reply_markup=InlineKeyboardMarkup(keyboard)
-#     )
-#     return "ESPERANDO_EDICION"
-
-# async def redirigir_edicion(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     query = update.callback_query
-#     await query.answer()
-#     opcion = query.data
-
-#     if opcion == "editar_descripcion":
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text="Escribe la nueva descripción:")
-#         return DESCRIPCION
-
-#     elif opcion == "editar_monto":
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text="Escribe el nuevo monto:")
-#         return MONTO
-
-#     elif opcion == "editar_pagador":
-#         keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in NOMBRES + ["Otro"]]
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text="¿Quién pagó?", reply_markup=InlineKeyboardMarkup(keyboard))
-#         return PAGADOR
-
-#     elif opcion == "editar_deudores":
-#         keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in OPCIONES_DEUDORES]
-#         keyboard.append([
-#             InlineKeyboardButton("Los 4", callback_data="Todos"),
-#             InlineKeyboardButton("Otro", callback_data="Otro"),
-#             InlineKeyboardButton("Listo", callback_data="Listo")
-#         ])
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text="¿Quiénes deben pagar?", reply_markup=InlineKeyboardMarkup(keyboard))
-#         return DEUDORES
-
-#     elif opcion == "editar_metodo":
-#         keyboard = [[InlineKeyboardButton(m, callback_data=m)] for m in METODOS]
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text="¿Con qué método pagó Óscar?", reply_markup=InlineKeyboardMarkup(keyboard))
-#         return METODO_PAGO
-
-#     elif opcion == "cancelar_edicion":
-#         return await mostrar_confirmacion(update, context)
 
 # -------------------- Aquí ya comienza lo del botón para revisar el saldo -------------------------
 
@@ -341,7 +285,7 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in data:
         deudor = row["Deudor"]
         acreedor = row["Prestador"]
-        monto = float(row["Monto"].replace('$', '').replace(',',''))
+        monto = float(str(row["Monto"]).replace('$', '').replace(',',''))
         balance.setdefault(deudor, {})
         balance.setdefault(acreedor, {})
         balance[deudor][acreedor] = balance[deudor].get(acreedor, 0) + monto
