@@ -282,6 +282,9 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = sheet.get_all_records()
     balance = {}
 
+    await update.message.reply_text("Calculando saldo...", parse_mode="Markdown")
+
+
     for row in data:
         deudor = row["Deudor"]
         acreedor = row["Prestador"]
@@ -296,7 +299,7 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             contraparte = balance.get(acreedor, {}).get(deudor, 0)
             neto = monto - contraparte
             if neto > 0:
-                resumen += f"• {deudor} → {acreedor}: ${round(neto, 2)}\n"
+                resumen += f"• {deudor} → {acreedor}: ${round(neto, 2):,}\n"
 
     await update.message.reply_text(resumen or "¡Todo está saldado!", parse_mode="Markdown")
 
