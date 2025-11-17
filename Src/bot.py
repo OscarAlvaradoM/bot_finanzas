@@ -1,0 +1,56 @@
+# bot.py
+import logging
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    filters
+)
+
+from config import TOKEN, DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA, INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL
+
+from handlers.start import start
+from handlers.cancelar import cancelar
+from handlers.saldo import saldo
+from handlers.gasto import (
+    gasto, recibir_descripcion, recibir_monto, recibir_pagador, 
+    recibir_pagador_manual, recibir_deudores, agregar_deudor_manual,
+    incluir_pagador, recibir_metodo_pago, confirmar_gasto
+)
+
+logging.basicConfig(level=logging.INFO)
+
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    conv = ConversationHandler(
+        entry_points=[CommandHandler("gasto", gasto)],
+        states={
+            DESCRIPCION: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_descripcion)],
+            MONTO: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_monto)],
+            PAGADOR: [CallbackQueryHandler(recibir_pagador)],
+            NOMBRE_PAGADOR_MANUAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_pagador_manual)],
+            DEUDORES: [CallbackQueryHandler(recibir_deudores)],
+            NOMBRE_DEUDOR_EXTRA: [MessageHandler(filters.TEXT & ~filters.COMMAND, agregar_deudor_manual)],
+            INCLUIR_PAGADOR: [CallbackQueryHandler(incluir_pagador)],
+            METODO_PAGO: [CallbackQueryHandler(recibir_metodo_pago)],
+            CONFIRMACION: [
+                CallbackQueryHandler(confirmar_gasto, pattern="^confirmar$"),
+                CallbackQueryHandler(cancelar, pattern="^cancelar$")
+            ]
+        },
+        fallbacks=[CommandHandler("cancelar", cancelar)]
+    )
+
+    app.add_handler(conv)
+    app.add_handler(CommandHandler("saldo", saldo))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("cancelar", cancelar))
+
+
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
