@@ -63,7 +63,7 @@ def main():
                 CallbackQueryHandler(pagar_cancelar, pattern="^cancelar_pago$")
             ],
         },
-        fallbacks=[CommandHandler("cancelar", pagar_cancelar)],
+        fallbacks=[CommandHandler("cancelar", cancelar)],
     )
 
 
