@@ -2,6 +2,11 @@
 .env
 Credenciales/
 *.json
-*.pyc
+
+# Evitar pycache
 __pycache__/
+*.py[cod]
+
+# Evitar checkpoints de Jupyter
 .ipynb_checkpoints/
+*/.ipynb_checkpoints/
