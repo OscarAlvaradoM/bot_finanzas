@@ -109,8 +109,8 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = [
         descripcion,
         -monto,       # NEGATIVO
-        receptor,     # Deudor = quien recibe el pago
-        pagador,      # Prestador = quien paga
+        pagador,
+        receptor,
         timestamp,
         ""            # Método vacío
     ]
