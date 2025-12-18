@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from config import (
     OPCIONES_PAGADORES,
-    PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR
+    PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 import datetime
 from sheets import init_gsheet
@@ -25,7 +25,7 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if pagador == "Otro":
         await query.edit_message_text("✍️ Escribe el nombre del pagador:")
-        return PAGAR_PAGADOR
+        return PAGAR_PAGADOR_OTRO
 
     context.user_data["pagador"] = pagador
 
@@ -40,6 +40,19 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return PAGAR_RECEPTOR
 
+async def pagar_pagador_otro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pagador = update.message.text
+    context.user_data["pagador"] = pagador
+
+    opciones = [p for p in OPCIONES_PAGADORES if p != pagador]
+    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in opciones + ["Otro"]]
+
+    await update.message.reply_text(
+        f"💳 ¿A quién le está pagando *{pagador}*?",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return PAGAR_RECEPTOR
 
 async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -48,7 +61,7 @@ async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if receptor == "Otro":
         await query.edit_message_text("✍️ Escribe el nombre del receptor del pago:")
-        return PAGAR_RECEPTOR
+        return PAGAR_RECEPTOR_OTRO
 
     context.user_data["receptor"] = receptor
 
@@ -58,6 +71,15 @@ async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return PAGAR_MONTO
 
+async def pagar_receptor_otro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    receptor = update.message.text
+    context.user_data["receptor"] = receptor
+
+    await update.message.reply_text(
+        f"💰 ¿Cuánto pagó *{context.user_data['pagador']}* a *{receptor}*?",
+        parse_mode="Markdown"
+    )
+    return PAGAR_MONTO
 
 async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:

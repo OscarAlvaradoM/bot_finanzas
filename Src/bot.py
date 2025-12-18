@@ -9,7 +9,7 @@ from telegram.ext import (
     filters
 )
 
-from config import TOKEN, DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA, INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL, PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR
+from config import TOKEN, DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA, INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL, PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 
 from handlers.start import start
 from handlers.cancelar import cancelar
@@ -22,7 +22,9 @@ from handlers.gasto import (
 from handlers.pago import (
     pagar,
     pagar_pagador,
+    pagar_pagador_otro,
     pagar_receptor,
+    pagar_receptor_otro,
     pagar_monto,
     pagar_confirmar,
     pagar_cancelar,
@@ -56,7 +58,9 @@ def main():
         entry_points=[CommandHandler("pago", pagar)],
         states={
             PAGAR_PAGADOR: [CallbackQueryHandler(pagar_pagador)],
+            PAGAR_PAGADOR_OTRO: [MessageHandler(filters.TEXT & ~filters.COMMAND, pagar_pagador_otro)],
             PAGAR_RECEPTOR: [CallbackQueryHandler(pagar_receptor)],
+            PAGAR_RECEPTOR_OTRO: [MessageHandler(filters.TEXT & ~filters.COMMAND, pagar_receptor_otro)],
             PAGAR_MONTO: [MessageHandler(filters.TEXT & ~filters.COMMAND, pagar_monto)],
             PAGAR_CONFIRMAR: [
                 CallbackQueryHandler(pagar_confirmar, pattern="^confirmar_pago$"),
@@ -65,7 +69,6 @@ def main():
         },
         fallbacks=[CommandHandler("cancelar", cancelar)],
     )
-
 
     app.add_handler(gasto_handler)
     app.add_handler(pago_handler)

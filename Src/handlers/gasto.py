@@ -120,7 +120,7 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return INCLUIR_PAGADOR
 
     elif data == "Todos":
-        grupo = ["Óscar", "Yetro", "Bichos", "Fabos"]
+        grupo = ["Óscar", "Yetro", "Bichos", "Fabos", "Judith"]
         grupo_final = [n for n in grupo if n != pagador]
         context.user_data["deudores"] = list(set(deudores + grupo_final))
         context.user_data["primer_pregunta_deudores"] = False
