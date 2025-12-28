@@ -8,6 +8,8 @@ from config import (
 )
 from sheets import init_gsheet
 
+# Al invocar el comando de /gasto
+# Preguntamos por la descripción del gasto
 async def gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     mensaje = await context.bot.send_message(
@@ -18,6 +20,7 @@ async def gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["mensaje_descripcion_id"] = mensaje.message_id
     return DESCRIPCION
 
+# Recibimos descripción del mensaje y preguntamos por monto que fue gastado
 async def recibir_descripcion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensaje_esperado = context.user_data.get("mensaje_descripcion_id")
     if update.message.reply_to_message and update.message.reply_to_message.message_id != mensaje_esperado:
@@ -33,6 +36,7 @@ async def recibir_descripcion(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data["mensaje_monto_id"] = mensaje_monto.message_id
     return MONTO
 
+# Recibimos monto y preguntamos por pagador
 async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensaje_esperado = context.user_data.get("mensaje_monto_id")
     if update.message.reply_to_message and update.message.reply_to_message.message_id != mensaje_esperado:
@@ -50,6 +54,7 @@ async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="👤 ¿Quién pagó?", reply_markup=InlineKeyboardMarkup(keyboard))
     return PAGADOR
 
+# Recibimos pagador y preguntamos por deudores
 async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -78,7 +83,7 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         return DEUDORES
-
+# Recibimos deudor manual y preguntamos por deudores
 async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pagador = update.message.text.strip()
     if not pagador:
@@ -104,6 +109,7 @@ async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_T
     )
     return DEUDORES
 
+# Recibimos deudores y preguntamos si el pagador también es deudor
 async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -119,8 +125,8 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="¿El pagador también es deudor?", reply_markup=InlineKeyboardMarkup(keyboard))
         return INCLUIR_PAGADOR
 
-    elif data == "Todos":
-        grupo = ["Óscar", "Yetro", "Bichos", "Fabos", "Judith"]
+    elif data == "Los 4 de siempre":
+        grupo = ["Óscar", "Yetro", "Bichos"]
         grupo_final = [n for n in grupo if n != pagador]
         context.user_data["deudores"] = list(set(deudores + grupo_final))
         context.user_data["primer_pregunta_deudores"] = False
@@ -148,7 +154,7 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     fila_extra = []
     if mostrar_todos:
-        fila_extra.append(InlineKeyboardButton("Los 4", callback_data="Todos"))
+        fila_extra.append(InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"))
     fila_extra.append(InlineKeyboardButton("Otro", callback_data="Otro"))
 
     if not context.user_data.get("primer_pregunta_deudores", True):
@@ -165,6 +171,7 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return DEUDORES
 
+# Recibimos deudor extra manualmente y volvemos a preguntar por deudores
 async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nuevo = update.message.text.strip()
     if nuevo:
@@ -194,6 +201,7 @@ async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TY
     )
     return DEUDORES
 
+# Recibinmos respuesta de si pagador es deudor y preguntamos por método de pago (en caso de ser Óscar) o confirmación
 async def incluir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -208,12 +216,14 @@ async def incluir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return await mostrar_confirmacion(update, context)
 
+# Si paga Óscar, acá recibimos el método de pago
 async def recibir_metodo_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["metodo_pago"] = query.data
     return await mostrar_confirmacion(update, context)
 
+# Mostramos el resumen del gasto y pedimos confirmación o cancelación
 async def mostrar_confirmacion(update, context):
     descripcion = context.user_data.get("descripcion","")
     monto = context.user_data.get("monto",0)
@@ -239,6 +249,7 @@ async def mostrar_confirmacion(update, context):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=resumen, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
     return CONFIRMACION
 
+# Confirmamos y guardamos el gasto en Google Sheets
 async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

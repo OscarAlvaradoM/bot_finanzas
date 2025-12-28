@@ -1,4 +1,3 @@
-# bot.py
 import logging
 from telegram.ext import (
     ApplicationBuilder,
@@ -9,15 +8,29 @@ from telegram.ext import (
     filters
 )
 
-from config import TOKEN, DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA, INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL, PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
+from config import (TOKEN, DESCRIPCION, MONTO, PAGADOR, 
+                    DEUDORES, NOMBRE_DEUDOR_EXTRA, 
+                    INCLUIR_PAGADOR, METODO_PAGO, 
+                    CONFIRMACION, NOMBRE_PAGADOR_MANUAL, 
+                    PAGAR_PAGADOR, PAGAR_RECEPTOR, 
+                    PAGAR_MONTO, PAGAR_CONFIRMAR, 
+                    PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
+)
 
 from handlers.start import start
 from handlers.cancelar import cancelar
 from handlers.saldo import saldo
 from handlers.gasto import (
-    gasto, recibir_descripcion, recibir_monto, recibir_pagador, 
-    recibir_pagador_manual, recibir_deudores, agregar_deudor_manual,
-    incluir_pagador, recibir_metodo_pago, confirmar_gasto
+    gasto, 
+    recibir_descripcion, 
+    recibir_monto, 
+    recibir_pagador, 
+    recibir_pagador_manual, 
+    recibir_deudores, 
+    agregar_deudor_manual,
+    incluir_pagador, 
+    recibir_metodo_pago, 
+    confirmar_gasto
 )
 from handlers.pago import (
     pagar,

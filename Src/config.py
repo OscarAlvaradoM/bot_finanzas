@@ -1,4 +1,3 @@
-# config.py
 import os
 from dotenv import load_dotenv
 
@@ -20,6 +19,6 @@ NOMBRE_PAGADOR_MANUAL = 99
 ) = range(100,106)
 
 # Constantes
-OPCIONES_PAGADORES = ["Óscar", "Yetro", "Bichos", "Fabos", "Judith"]
-OPCIONES_DEUDORES = ["Óscar", "Yetro", "Bichos", "Fabos", "Judith"]
-METODOS = ["Santander Oro", "Rappi", "BBVA", "LikeU", "Banamex", "Efectivo"]
+OPCIONES_PAGADORES = ["Óscar", "Yetro", "Judith", "Bichos", "Fabos"]
+OPCIONES_DEUDORES = ["Óscar", "Yetro", "Judith", "Bichos", "Fabos"]
+METODOS = ["Tarjeta", "Efectivo"]

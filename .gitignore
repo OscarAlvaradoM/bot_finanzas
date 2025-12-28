@@ -10,3 +10,7 @@ __pycache__/
 # Evitar checkpoints de Jupyter
 .ipynb_checkpoints/
 */.ipynb_checkpoints/
+
+# Evitar DS_Store en macOS
+.DS_Store
+*/.DS_Store
