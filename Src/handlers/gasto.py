@@ -72,7 +72,7 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
         nombres_disponibles = [n for n in OPCIONES_DEUDORES if n != opcion]
 
         keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-        fila_extra = [InlineKeyboardButton("Los 4", callback_data="Todos"), InlineKeyboardButton("Otro", callback_data="Otro")]
+        fila_extra = [InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"), InlineKeyboardButton("Otro", callback_data="Otro")]
 
         keyboard.append(fila_extra)
 
@@ -96,7 +96,7 @@ async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_T
     nombres_disponibles = [n for n in OPCIONES_DEUDORES if n != pagador]
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
     keyboard.append([
-        InlineKeyboardButton("Los 4", callback_data="Todos"),
+        InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"),
         InlineKeyboardButton("Otro", callback_data="Otro"),
         InlineKeyboardButton("Listo", callback_data="Listo")
     ])
@@ -188,7 +188,7 @@ async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TY
     nombres_faltantes = [n for n in OPCIONES_DEUDORES if n not in context.user_data.get("deudores", [])]
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_faltantes]
     keyboard.append([
-        InlineKeyboardButton("Los 4", callback_data="Todos"),
+        InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"),
         InlineKeyboardButton("Otro", callback_data="Otro"),
         InlineKeyboardButton("Listo", callback_data="Listo")
     ])
