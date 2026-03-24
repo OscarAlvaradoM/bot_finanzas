@@ -5,6 +5,7 @@ from config import (
     PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 import datetime
+from domain.errors import RepositoryError
 from handlers.callback_guard import finish_callback
 from handlers.conversation_state import create_payment_draft, get_payment_draft
 from repositories.sheets_repository import append_movement
@@ -128,15 +129,20 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft.processed = True
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_movement(
-        build_payment_row(
-            draft.pagador,
-            draft.receptor,
-            draft.monto,
-            timestamp,
-            draft.movement_id or generate_movement_id(),
+    try:
+        append_movement(
+            build_payment_row(
+                draft.pagador,
+                draft.receptor,
+                draft.monto,
+                timestamp,
+                draft.movement_id or generate_movement_id(),
+            )
         )
-    )
+    except RepositoryError:
+        draft.processed = False
+        await finish_callback(query, "❌ No pude registrar el pago. Intenta de nuevo en unos minutos.")
+        return PAGAR_CONFIRMAR
     await finish_callback(query, "✅ Pago registrado. Esta confirmación ya quedó cerrada.")
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Pago registrado exitosamente! ✅")

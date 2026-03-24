@@ -6,6 +6,7 @@ from config import (
     INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL,
     OPCIONES_PAGADORES, METODOS
 )
+from domain.errors import RepositoryError
 from handlers.callback_guard import (
     finish_callback,
 )
@@ -261,7 +262,13 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         draft.metodo_pago,
         draft.movement_id or generate_movement_id(),
     )
-    append_movements(movements)
+    try:
+        append_movements(movements)
+    except RepositoryError:
+        draft.processed = False
+        await finish_callback(query, "❌ No pude registrar el gasto. Intenta de nuevo en unos minutos.")
+        return CONFIRMACION
+
     await finish_callback(query, "✅ Gasto registrado. Esta confirmación ya quedó cerrada.")
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Gasto registrado exitosamente! ✅")

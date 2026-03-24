@@ -2,6 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
+from domain.errors import RepositoryError
 from domain.models import ExpenseDraft, Movement
 from tests.helpers import FakeBot, FakeCallbackQuery, FakeContext, FakeUpdate
 
@@ -98,6 +99,28 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(
             update.callback_query.edits[-1]["text"],
             "⚠️ Este gasto ya fue registrado anteriormente.",
+        )
+
+    def test_confirmar_gasto_muestra_error_si_falla_persistencia(self):
+        update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar"))
+        draft = ExpenseDraft(
+            descripcion="Super",
+            monto=300.0,
+            pagador="Óscar",
+            deudores=["Yetro", "Fabos"],
+            metodo_pago="Tarjeta",
+            movement_id="gasto-123",
+        )
+        context = FakeContext(user_data={"expense_draft": draft})
+
+        with patch("handlers.gasto.append_movements", side_effect=RepositoryError("fallo")):
+            state = asyncio.run(confirmar_gasto(update, context))
+
+        self.assertEqual(state, CONFIRMACION)
+        self.assertFalse(draft.processed)
+        self.assertEqual(
+            update.callback_query.edits[-1]["text"],
+            "❌ No pude registrar el gasto. Intenta de nuevo en unos minutos.",
         )
 
     def test_build_expense_rows_reparte_por_pesos(self):

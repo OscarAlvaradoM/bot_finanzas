@@ -2,9 +2,11 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
+from domain.errors import RepositoryError
 from domain.models import Movement, PaymentDraft
 from tests.helpers import FakeCallbackQuery, FakeContext, FakeUpdate
 
+from config import PAGAR_CONFIRMAR
 from handlers.pago import pagar_confirmar
 from services.finance_service import build_payment_row
 from telegram.ext import ConversationHandler
@@ -64,6 +66,26 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(
             update.callback_query.edits[-1]["text"],
             "⚠️ Este pago ya fue registrado anteriormente.",
+        )
+
+    def test_pagar_confirmar_muestra_error_si_falla_persistencia(self):
+        update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar_pago"))
+        draft = PaymentDraft(
+            pagador="Óscar",
+            receptor="Yetro",
+            monto=250.0,
+            movement_id="pago-123",
+        )
+        context = FakeContext(user_data={"payment_draft": draft})
+
+        with patch("handlers.pago.append_movement", side_effect=RepositoryError("fallo")):
+            state = asyncio.run(pagar_confirmar(update, context))
+
+        self.assertEqual(state, PAGAR_CONFIRMAR)
+        self.assertFalse(draft.processed)
+        self.assertEqual(
+            update.callback_query.edits[-1]["text"],
+            "❌ No pude registrar el pago. Intenta de nuevo en unos minutos.",
         )
 
     def test_build_payment_row_crea_formato_esperado(self):

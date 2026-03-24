@@ -2,6 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
+from domain.errors import RepositoryError
 from domain.models import Movement
 from tests.helpers import FakeContext, FakeMessage, FakeUpdate
 
@@ -47,3 +48,16 @@ class SaldoTests(unittest.TestCase):
         )
 
         self.assertEqual(summary, "🎉 ¡Todo está saldado!")
+
+    def test_saldo_muestra_error_si_falla_consulta(self):
+        message = FakeMessage()
+        update = FakeUpdate(message=message)
+
+        with patch("handlers.saldo.fetch_movements", side_effect=RepositoryError("fallo")):
+            asyncio.run(saldo(update, FakeContext()))
+
+        self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
+        self.assertEqual(
+            message.replies[1]["text"],
+            "❌ No pude consultar los saldos en este momento. Intenta de nuevo más tarde.",
+        )
