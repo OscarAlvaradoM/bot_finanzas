@@ -2,9 +2,9 @@ import logging
 
 from domain.errors import RepositoryError
 from domain.models import Movement
+from domain.schema import SHEET_HEADERS
 from sheets import init_gsheet
 
-SHEET_HEADERS = ["Descripcion", "Monto", "Deudor", "Prestador", "Fecha", "Metodo", "MovementId"]
 logger = logging.getLogger(__name__)
 
 

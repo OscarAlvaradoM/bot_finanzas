@@ -3,6 +3,8 @@ import sys
 import types
 from types import SimpleNamespace
 
+from domain.schema import SHEET_HEADERS
+
 
 ROOT_DIR = pathlib.Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT_DIR / "Src"
@@ -129,7 +131,7 @@ class FakeSheet:
     def __init__(self, *, records=None, headers=None):
         self.records = records or []
         self.rows = []
-        self.headers = headers or ["Descripcion", "Monto", "Deudor", "Prestador", "Fecha", "Metodo"]
+        self.headers = headers or SHEET_HEADERS[:-1]
 
     def get_all_records(self):
         return self.records

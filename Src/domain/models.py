@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from domain.rules import PAYMENT_METHOD_OWNER
+from domain.schema import SHEET_COLUMNS
 
 
 @dataclass(frozen=True)
@@ -19,13 +20,13 @@ class Movement:
     @classmethod
     def from_sheet_record(cls, record: dict) -> "Movement":
         return cls(
-            descripcion=str(record.get("Descripcion", record.get("Descripción", ""))),
-            monto=float(str(record["Monto"]).replace("$", "").replace(",", "")),
-            deudor=record["Deudor"],
-            acreedor=record["Prestador"],
-            timestamp=str(record.get("Fecha", "")),
-            metodo_pago=str(record.get("Metodo", record.get("Método", ""))),
-            movement_id=str(record.get("MovementId", "")),
+            descripcion=str(_get_record_value(record, "descripcion", "")),
+            monto=float(str(_get_record_value(record, "monto", "0")).replace("$", "").replace(",", "")),
+            deudor=str(_get_record_value(record, "deudor", "")),
+            acreedor=str(_get_record_value(record, "acreedor", "")),
+            timestamp=str(_get_record_value(record, "timestamp", "")),
+            metodo_pago=str(_get_record_value(record, "metodo_pago", "")),
+            movement_id=str(_get_record_value(record, "movement_id", "")),
         )
 
     def to_sheet_row(self) -> list:
@@ -43,6 +44,13 @@ class Movement:
 def _serialize_amount(value: float) -> str:
     normalized = Decimal(str(value)).normalize()
     return format(normalized, "f")
+
+
+def _get_record_value(record: dict, field_name: str, default):
+    for column_name in SHEET_COLUMNS[field_name]:
+        if column_name in record:
+            return record[column_name]
+    return default
 
 
 @dataclass
