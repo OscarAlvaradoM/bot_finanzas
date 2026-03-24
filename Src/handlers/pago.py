@@ -21,6 +21,7 @@ from services.validators import validate_amount_text, validate_required_name
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     create_payment_draft(context)
+    await update.message.reply_text("Calculando deudas para mostrar opciones...")
     try:
         movements = fetch_movements()
         opciones = get_people_with_debt(movements)

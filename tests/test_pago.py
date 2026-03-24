@@ -38,7 +38,8 @@ class PagoTests(unittest.TestCase):
             state = asyncio.run(pagar(update, context))
 
         self.assertEqual(state, PAGAR_PAGADOR)
-        keyboard = context.bot.sent_messages[0]["reply_markup"].keyboard
+        self.assertEqual(context.bot.sent_messages[0]["text"], "Calculando deudas para mostrar opciones...")
+        keyboard = context.bot.sent_messages[1]["reply_markup"].keyboard
         labels = [row[0].text for row in keyboard]
         self.assertEqual(labels, ["Óscar", "Otro"])
 

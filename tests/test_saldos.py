@@ -29,7 +29,8 @@ class SaldoTests(unittest.TestCase):
 
         self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
         self.assertIn("Óscar: $300.0", message.replies[1]["text"])
-        self.assertIn("Óscar → Yetro: $300.0", message.replies[2]["text"])
+        self.assertIn("*Óscar*", message.replies[2]["text"])
+        self.assertIn("Debe a Yetro: $300.0", message.replies[2]["text"])
         self.assertNotIn("Yetro → Óscar", message.replies[2]["text"])
 
     def test_saldo_reduce_deuda_con_pago_negativo(self):
@@ -44,7 +45,7 @@ class SaldoTests(unittest.TestCase):
             asyncio.run(saldo(update, FakeContext()))
 
         self.assertIn("Óscar: $350.0", message.replies[1]["text"])
-        self.assertIn("Óscar → Yetro: $350.0", message.replies[2]["text"])
+        self.assertIn("Debe a Yetro: $350.0", message.replies[2]["text"])
 
     def test_build_balance_summary_muestra_todo_saldado_si_no_hay_deuda(self):
         summary = build_balance_summary(
@@ -107,4 +108,4 @@ class SaldoTests(unittest.TestCase):
 
         self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
         self.assertIn("Resumen por persona", message.replies[1]["text"])
-        self.assertIn("Saldos pendientes", message.replies[2]["text"])
+        self.assertIn("Saldos pendientes por deudor", message.replies[2]["text"])

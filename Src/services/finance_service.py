@@ -128,13 +128,14 @@ def _format_currency(amount: float) -> str:
 
 def build_balance_summary(movements: list[Movement]) -> str:
     net_balances = get_net_balances(movements)
-    resumen = "💳 *Saldos pendientes:*\n"
+    resumen = "💳 *Saldos pendientes por deudor:*\n"
 
-    for deudor, acreedores in net_balances.items():
-        for acreedor, monto in acreedores.items():
-            resumen += f"• {deudor} → {acreedor}: {_format_currency(round(monto, 2))}\n"
+    for deudor, acreedores in sorted(net_balances.items()):
+        resumen += f"\n*{deudor}*\n"
+        for acreedor, monto in sorted(acreedores.items()):
+            resumen += f"• Debe a {acreedor}: {_format_currency(round(monto, 2))}\n"
 
-    if resumen.strip() == "💳 *Saldos pendientes:*":
+    if resumen.strip() == "💳 *Saldos pendientes por deudor:*":
         return "🎉 ¡Todo está saldado!"
 
     return resumen
