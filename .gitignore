@@ -1,7 +1,10 @@
 # Ignora archivos de variables de entorno
 .env
+.env.dev
+.env.prod
 Credenciales/
 *.json
+Credenciales/*.json
 
 # Evitar pycache
 __pycache__/
