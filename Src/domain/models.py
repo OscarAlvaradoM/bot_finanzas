@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from domain.rules import PAYMENT_METHOD_OWNER
@@ -43,3 +43,44 @@ class Movement:
 def _serialize_amount(value: float) -> str:
     normalized = Decimal(str(value)).normalize()
     return format(normalized, "f")
+
+
+@dataclass
+class ExpenseDraft:
+    descripcion: str = ""
+    monto: float = 0.0
+    pagador: str = ""
+    deudores: list[str] = field(default_factory=list)
+    metodo_pago: str = ""
+    movement_id: str = ""
+    processed: bool = False
+    mensaje_descripcion_id: int | None = None
+    mensaje_monto_id: int | None = None
+    primer_pregunta_deudores: bool = True
+
+    def add_deudor(self, deudor: str) -> bool:
+        if deudor in self.deudores or deudor == self.pagador:
+            return False
+        self.deudores.append(deudor)
+        self.primer_pregunta_deudores = False
+        return True
+
+    def add_deudores(self, nuevos_deudores: list[str]) -> None:
+        for deudor in nuevos_deudores:
+            if deudor not in self.deudores and deudor != self.pagador:
+                self.deudores.append(deudor)
+        if nuevos_deudores:
+            self.primer_pregunta_deudores = False
+
+    def include_pagador(self) -> None:
+        if self.pagador and self.pagador not in self.deudores:
+            self.deudores.append(self.pagador)
+
+
+@dataclass
+class PaymentDraft:
+    pagador: str = ""
+    receptor: str = ""
+    monto: float = 0.0
+    movement_id: str = ""
+    processed: bool = False

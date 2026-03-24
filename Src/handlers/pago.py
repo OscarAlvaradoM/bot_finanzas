@@ -5,16 +5,13 @@ from config import (
     PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 import datetime
-from handlers.callback_guard import (
-    finish_callback,
-    mark_callback_processed,
-    was_callback_processed,
-)
+from handlers.callback_guard import finish_callback
+from handlers.conversation_state import create_payment_draft, get_payment_draft
 from repositories.sheets_repository import append_movement
 from services.finance_service import build_payment_row, build_payment_summary, generate_movement_id, parse_amount
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
+    create_payment_draft(context)
 
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in OPCIONES_PAGADORES + ["Otro"]]
 
@@ -28,12 +25,13 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     pagador = query.data
+    draft = get_payment_draft(context)
 
     if pagador == "Otro":
         await query.edit_message_text("✍️ Escribe el nombre del pagador:")
         return PAGAR_PAGADOR_OTRO
 
-    context.user_data["pagador"] = pagador
+    draft.pagador = pagador
 
     # Preguntar a quién paga
     opciones = [p for p in OPCIONES_PAGADORES if p != pagador]
@@ -47,8 +45,9 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return PAGAR_RECEPTOR
 
 async def pagar_pagador_otro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    draft = get_payment_draft(context)
     pagador = update.message.text
-    context.user_data["pagador"] = pagador
+    draft.pagador = pagador
 
     opciones = [p for p in OPCIONES_PAGADORES if p != pagador]
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in opciones + ["Otro"]]
@@ -64,43 +63,44 @@ async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     receptor = query.data
+    draft = get_payment_draft(context)
 
     if receptor == "Otro":
         await query.edit_message_text("✍️ Escribe el nombre del receptor del pago:")
         return PAGAR_RECEPTOR_OTRO
 
-    context.user_data["receptor"] = receptor
+    draft.receptor = receptor
 
     await query.edit_message_text(
-        f"💰 ¿Cuánto pagó *{context.user_data['pagador']}* a *{receptor}*?",
+        f"💰 ¿Cuánto pagó *{draft.pagador}* a *{receptor}*?",
         parse_mode="Markdown"
     )
     return PAGAR_MONTO
 
 async def pagar_receptor_otro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    draft = get_payment_draft(context)
     receptor = update.message.text
-    context.user_data["receptor"] = receptor
+    draft.receptor = receptor
 
     await update.message.reply_text(
-        f"💰 ¿Cuánto pagó *{context.user_data['pagador']}* a *{receptor}*?",
+        f"💰 ¿Cuánto pagó *{draft.pagador}* a *{receptor}*?",
         parse_mode="Markdown"
     )
     return PAGAR_MONTO
 
 async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    draft = get_payment_draft(context)
     try:
         monto = parse_amount(update.message.text)
     except ValueError:
         await update.message.reply_text("Monto inválido. Escribe un número. Ej: 250.00")
         return PAGAR_MONTO
 
-    context.user_data["monto"] = monto
+    draft.monto = monto
+    if not draft.movement_id:
+        draft.movement_id = generate_movement_id()
 
-    pagador = context.user_data["pagador"]
-    receptor = context.user_data["receptor"]
-    context.user_data.setdefault("pago_movement_id", generate_movement_id())
-
-    resumen = build_payment_summary(pagador, receptor, monto)
+    resumen = build_payment_summary(draft.pagador, draft.receptor, monto)
 
     keyboard = [
         [InlineKeyboardButton("Confirmar ✅", callback_data="confirmar_pago")],
@@ -119,25 +119,22 @@ async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    draft = get_payment_draft(context)
 
-    if was_callback_processed(context, "pago_confirmado"):
+    if draft.processed:
         await finish_callback(query, "⚠️ Este pago ya fue registrado anteriormente.")
         return ConversationHandler.END
 
-    mark_callback_processed(context, "pago_confirmado")
-
-    pagador = context.user_data["pagador"]
-    receptor = context.user_data["receptor"]
-    monto = context.user_data["monto"]
+    draft.processed = True
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     append_movement(
         build_payment_row(
-            pagador,
-            receptor,
-            monto,
+            draft.pagador,
+            draft.receptor,
+            draft.monto,
             timestamp,
-            context.user_data.setdefault("pago_movement_id", generate_movement_id()),
+            draft.movement_id or generate_movement_id(),
         )
     )
     await finish_callback(query, "✅ Pago registrado. Esta confirmación ya quedó cerrada.")

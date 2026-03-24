@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from domain.models import Movement
+from domain.models import ExpenseDraft, Movement
 from tests.helpers import FakeBot, FakeCallbackQuery, FakeContext, FakeUpdate
 
 from config import CONFIRMACION
@@ -17,11 +17,13 @@ class GastoTests(unittest.TestCase):
         context = FakeContext(
             bot=bot,
             user_data={
-                "descripcion": "Cena",
-                "monto": 300.0,
-                "pagador": "Óscar",
-                "deudores": ["Yetro", "Fabos"],
-                "metodo_pago": "Tarjeta",
+                "expense_draft": ExpenseDraft(
+                    descripcion="Cena",
+                    monto=300.0,
+                    pagador="Óscar",
+                    deudores=["Yetro", "Fabos"],
+                    metodo_pago="Tarjeta",
+                ),
             },
         )
 
@@ -39,11 +41,14 @@ class GastoTests(unittest.TestCase):
         update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar"))
         context = FakeContext(
             user_data={
-                "descripcion": "Super",
-                "monto": 300.0,
-                "pagador": "Óscar",
-                "deudores": ["Yetro", "Fabos"],
-                "metodo_pago": "Tarjeta",
+                "expense_draft": ExpenseDraft(
+                    descripcion="Super",
+                    monto=300.0,
+                    pagador="Óscar",
+                    deudores=["Yetro", "Fabos"],
+                    metodo_pago="Tarjeta",
+                    movement_id="gasto-123",
+                ),
             }
         )
 
@@ -58,7 +63,7 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(movements[0].deudor, "Yetro")
         self.assertEqual(movements[0].acreedor, "Óscar")
         self.assertEqual(movements[0].metodo_pago, "Tarjeta")
-        self.assertTrue(movements[0].movement_id)
+        self.assertEqual(movements[0].movement_id, "gasto-123")
         self.assertEqual(movements[0].movement_id, movements[1].movement_id)
         self.assertEqual(movements[1].monto, 200.0)
         self.assertEqual(movements[1].deudor, "Fabos")
@@ -72,11 +77,14 @@ class GastoTests(unittest.TestCase):
         update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar"))
         context = FakeContext(
             user_data={
-                "descripcion": "Super",
-                "monto": 300.0,
-                "pagador": "Óscar",
-                "deudores": ["Yetro", "Fabos"],
-                "metodo_pago": "Tarjeta",
+                "expense_draft": ExpenseDraft(
+                    descripcion="Super",
+                    monto=300.0,
+                    pagador="Óscar",
+                    deudores=["Yetro", "Fabos"],
+                    metodo_pago="Tarjeta",
+                    movement_id="gasto-123",
+                ),
             }
         )
 

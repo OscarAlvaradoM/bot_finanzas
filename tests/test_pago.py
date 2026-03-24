@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from domain.models import Movement
+from domain.models import Movement, PaymentDraft
 from tests.helpers import FakeCallbackQuery, FakeContext, FakeUpdate
 
 from handlers.pago import pagar_confirmar
@@ -15,9 +15,12 @@ class PagoTests(unittest.TestCase):
         update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar_pago"))
         context = FakeContext(
             user_data={
-                "pagador": "Óscar",
-                "receptor": "Yetro",
-                "monto": 250.0,
+                "payment_draft": PaymentDraft(
+                    pagador="Óscar",
+                    receptor="Yetro",
+                    monto=250.0,
+                    movement_id="pago-123",
+                ),
             }
         )
 
@@ -31,7 +34,7 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(movement.deudor, "Óscar")
         self.assertEqual(movement.acreedor, "Yetro")
         self.assertEqual(movement.metodo_pago, "")
-        self.assertTrue(movement.movement_id)
+        self.assertEqual(movement.movement_id, "pago-123")
         self.assertEqual(context.bot.sent_messages[0]["text"], "¡Pago registrado exitosamente! ✅")
         self.assertEqual(
             update.callback_query.edits[0]["text"],
@@ -42,9 +45,12 @@ class PagoTests(unittest.TestCase):
         update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar_pago"))
         context = FakeContext(
             user_data={
-                "pagador": "Óscar",
-                "receptor": "Yetro",
-                "monto": 250.0,
+                "payment_draft": PaymentDraft(
+                    pagador="Óscar",
+                    receptor="Yetro",
+                    monto=250.0,
+                    movement_id="pago-123",
+                ),
             }
         )
 
