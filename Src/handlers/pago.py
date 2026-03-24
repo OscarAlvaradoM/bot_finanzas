@@ -227,7 +227,18 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PAGAR_CONFIRMAR
     await finish_callback(query, "✅ Pago registrado. Esta confirmación ya quedó cerrada.")
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Pago registrado exitosamente! ✅")
+    saldo_restante = None
+    try:
+        movimientos_actualizados = fetch_movements()
+        saldo_restante = get_debt_amount(movimientos_actualizados, draft.pagador, draft.receptor)
+    except RepositoryError:
+        saldo_restante = None
+
+    mensaje = "¡Pago registrado exitosamente! ✅"
+    if saldo_restante is not None:
+        mensaje += f"\nSaldo restante de {draft.pagador} con {draft.receptor}: ${saldo_restante:,.2f}"
+
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=mensaje)
     return ConversationHandler.END
 
 

@@ -106,7 +106,10 @@ class PagoTests(unittest.TestCase):
             }
         )
 
-        with patch("handlers.pago.append_movement") as mocked_append_movement:
+        with patch("handlers.pago.append_movement") as mocked_append_movement, patch(
+            "handlers.pago.fetch_movements",
+            return_value=[Movement("Pago", -250.0, "Óscar", "Yetro", "2026-03-23 11:00:00")],
+        ):
             state = asyncio.run(pagar_confirmar(update, context))
 
         self.assertEqual(state, ConversationHandler.END)
@@ -117,7 +120,8 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(movement.acreedor, "Yetro")
         self.assertEqual(movement.metodo_pago, "")
         self.assertEqual(movement.movement_id, "pago-123")
-        self.assertEqual(context.bot.sent_messages[0]["text"], "¡Pago registrado exitosamente! ✅")
+        self.assertIn("¡Pago registrado exitosamente! ✅", context.bot.sent_messages[0]["text"])
+        self.assertIn("Saldo restante", context.bot.sent_messages[0]["text"])
         self.assertEqual(
             update.callback_query.edits[0]["text"],
             "✅ Pago registrado. Esta confirmación ya quedó cerrada.",
@@ -136,7 +140,10 @@ class PagoTests(unittest.TestCase):
             }
         )
 
-        with patch("handlers.pago.append_movement") as mocked_append_movement:
+        with patch("handlers.pago.append_movement") as mocked_append_movement, patch(
+            "handlers.pago.fetch_movements",
+            return_value=[Movement("Pago", -250.0, "Óscar", "Yetro", "2026-03-23 11:00:00")],
+        ):
             first_state = asyncio.run(pagar_confirmar(update, context))
             second_state = asyncio.run(pagar_confirmar(update, context))
 
@@ -158,7 +165,10 @@ class PagoTests(unittest.TestCase):
         )
         context = FakeContext(user_data={"payment_draft": draft})
 
-        with patch("handlers.pago.append_movement", side_effect=RepositoryError("fallo")):
+        with patch("handlers.pago.append_movement", side_effect=RepositoryError("fallo")), patch(
+            "handlers.pago.fetch_movements",
+            return_value=[],
+        ):
             state = asyncio.run(pagar_confirmar(update, context))
 
         self.assertEqual(state, PAGAR_CONFIRMAR)

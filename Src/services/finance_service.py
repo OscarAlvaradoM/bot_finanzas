@@ -127,15 +127,12 @@ def _format_currency(amount: float) -> str:
 
 
 def build_balance_summary(movements: list[Movement]) -> str:
-    balance = build_balance_map(movements)
+    net_balances = get_net_balances(movements)
     resumen = "💳 *Saldos pendientes:*\n"
 
-    for deudor, acreedores in balance.items():
+    for deudor, acreedores in net_balances.items():
         for acreedor, monto in acreedores.items():
-            contraparte = balance.get(acreedor, {}).get(deudor, 0)
-            neto = monto - contraparte
-            if neto > 0:
-                resumen += f"• {deudor} → {acreedor}: {_format_currency(round(neto, 2))}\n"
+            resumen += f"• {deudor} → {acreedor}: {_format_currency(round(monto, 2))}\n"
 
     if resumen.strip() == "💳 *Saldos pendientes:*":
         return "🎉 ¡Todo está saldado!"
@@ -167,3 +164,44 @@ def get_creditors_for_debtor(movements: list[Movement], deudor: str) -> list[str
 
 def get_debt_amount(movements: list[Movement], deudor: str, acreedor: str) -> float:
     return get_net_balances(movements).get(deudor, {}).get(acreedor, 0.0)
+
+
+def get_total_debt_by_person(movements: list[Movement]) -> dict[str, float]:
+    net_balances = get_net_balances(movements)
+    return {
+        person: round(sum(acreedores.values()), 2)
+        for person, acreedores in net_balances.items()
+    }
+
+
+def get_total_credit_by_person(movements: list[Movement]) -> dict[str, float]:
+    net_balances = get_net_balances(movements)
+    credits: dict[str, float] = {}
+
+    for acreedores in net_balances.values():
+        for acreedor, monto in acreedores.items():
+            credits[acreedor] = round(credits.get(acreedor, 0) + monto, 2)
+
+    return credits
+
+
+def build_people_totals_summary(movements: list[Movement]) -> str:
+    total_debt = get_total_debt_by_person(movements)
+    total_credit = get_total_credit_by_person(movements)
+
+    if not total_debt and not total_credit:
+        return "🎉 ¡Todo está saldado!"
+
+    resumen = "👥 *Resumen por persona:*\n"
+
+    if total_debt:
+        resumen += "\n*Total que debe cada persona:*\n"
+        for person, amount in sorted(total_debt.items()):
+            resumen += f"• {person}: {_format_currency(amount)}\n"
+
+    if total_credit:
+        resumen += "\n*Total que le deben a cada persona:*\n"
+        for person, amount in sorted(total_credit.items()):
+            resumen += f"• {person}: {_format_currency(amount)}\n"
+
+    return resumen
