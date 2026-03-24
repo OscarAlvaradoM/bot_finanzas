@@ -1,10 +1,15 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+APP_ENV = os.getenv("APP_ENV", "dev")
+ENV_FILE = f".env.{APP_ENV}"
+
+load_dotenv(ENV_FILE)
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 GOOGLE_CREDS_PATH = os.getenv("GOOGLE_CREDS_PATH")
+GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME")
+GOOGLE_WORKSHEET_NAME = os.getenv("GOOGLE_WORKSHEET_NAME", "Hoja1")
 
 # Estados
 DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA, INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION = range(8)
