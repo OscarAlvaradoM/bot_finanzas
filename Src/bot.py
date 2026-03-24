@@ -11,10 +11,10 @@ from telegram.ext import (
 from config import (TOKEN, DESCRIPCION, MONTO, PAGADOR, 
                     DEUDORES, NOMBRE_DEUDOR_EXTRA, 
                     INCLUIR_PAGADOR, METODO_PAGO, 
-                    CONFIRMACION, NOMBRE_PAGADOR_MANUAL, 
-                    PAGAR_PAGADOR, PAGAR_RECEPTOR, 
-                    PAGAR_MONTO, PAGAR_CONFIRMAR, 
-                    PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
+    CONFIRMACION, NOMBRE_PAGADOR_MANUAL, 
+    PAGAR_PAGADOR, PAGAR_RECEPTOR, 
+    PAGAR_DECISION_MONTO, PAGAR_MONTO, PAGAR_CONFIRMAR, 
+    PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 
 from handlers.start import start
@@ -38,6 +38,7 @@ from handlers.pago import (
     pagar_pagador_otro,
     pagar_receptor,
     pagar_receptor_otro,
+    pagar_decidir_monto,
     pagar_monto,
     pagar_confirmar,
     pagar_cancelar,
@@ -74,6 +75,7 @@ def main():
             PAGAR_PAGADOR_OTRO: [MessageHandler(filters.TEXT & ~filters.COMMAND, pagar_pagador_otro)],
             PAGAR_RECEPTOR: [CallbackQueryHandler(pagar_receptor)],
             PAGAR_RECEPTOR_OTRO: [MessageHandler(filters.TEXT & ~filters.COMMAND, pagar_receptor_otro)],
+            PAGAR_DECISION_MONTO: [CallbackQueryHandler(pagar_decidir_monto)],
             PAGAR_MONTO: [MessageHandler(filters.TEXT & ~filters.COMMAND, pagar_monto)],
             PAGAR_CONFIRMAR: [
                 CallbackQueryHandler(pagar_confirmar, pattern="^confirmar_pago$"),

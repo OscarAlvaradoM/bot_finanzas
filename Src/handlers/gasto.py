@@ -4,54 +4,79 @@ import datetime
 from config import (
     DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA,
     INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL,
-    OPCIONES_PAGADORES, OPCIONES_DEUDORES, METODOS
+    OPCIONES_PAGADORES, METODOS
 )
-from sheets import init_gsheet
+from domain.errors import RepositoryError
+from handlers.callback_guard import (
+    finish_callback,
+)
+from handlers.conversation_state import (
+    create_expense_draft,
+    get_expense_draft,
+)
+from handlers.gasto_ui import (
+    build_deudores_keyboard,
+    build_include_pagador_keyboard,
+    build_name_keyboard,
+    build_payment_method_keyboard,
+    should_ask_payment_method,
+)
+from repositories.sheets_repository import append_movements
+from services.finance_service import (
+    build_expense_rows,
+    build_expense_summary,
+    build_fixed_group,
+    generate_movement_id,
+)
+from services.validators import is_expected_reply, validate_amount_text, validate_required_name
 
 # Al invocar el comando de /gasto
 # Preguntamos por la descripción del gasto
 async def gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
+    draft = create_expense_draft(context)
     mensaje = await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="📌 ¿Cuál es la descripción del gasto?\n\nResponde directamente a este mensaje.",
+        text="🧾 *Nuevo gasto*\n\nCuéntame la *descripción del gasto*.\nRespóndeme directamente a este mensaje.",
         parse_mode="Markdown"
     )
-    context.user_data["mensaje_descripcion_id"] = mensaje.message_id
+    draft.mensaje_descripcion_id = mensaje.message_id
     return DESCRIPCION
 
 # Recibimos descripción del mensaje y preguntamos por monto que fue gastado
 async def recibir_descripcion(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mensaje_esperado = context.user_data.get("mensaje_descripcion_id")
-    if update.message.reply_to_message and update.message.reply_to_message.message_id != mensaje_esperado:
-        await update.message.reply_text("Por favor, responde directamente al mensaje que pregunta por la descripción del gasto.")
+    draft = get_expense_draft(context)
+    if not is_expected_reply(update.message, draft.mensaje_descripcion_id):
+        await update.message.reply_text("⚠️ Respóndeme directamente al mensaje donde te pedí la *descripción del gasto*.", parse_mode="Markdown")
         return DESCRIPCION
 
-    context.user_data["descripcion"] = update.message.text
+    draft.descripcion = update.message.text
     mensaje_monto = await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="💰 ¿Cuál fue el monto total? (ej. 1234.56)\n\nResponde directamente a este mensaje.",
+        text="💰 Ahora dime el *monto total*.\n\nEjemplo: *1234.56*\nRespóndeme directamente a este mensaje.",
         parse_mode="Markdown"
     )
-    context.user_data["mensaje_monto_id"] = mensaje_monto.message_id
+    draft.mensaje_monto_id = mensaje_monto.message_id
     return MONTO
 
 # Recibimos monto y preguntamos por pagador
 async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mensaje_esperado = context.user_data.get("mensaje_monto_id")
-    if update.message.reply_to_message and update.message.reply_to_message.message_id != mensaje_esperado:
-        await update.message.reply_text("Por favor, responde directamente al mensaje que pregunta por el monto.")
+    draft = get_expense_draft(context)
+    if not is_expected_reply(update.message, draft.mensaje_monto_id):
+        await update.message.reply_text("⚠️ Respóndeme directamente al mensaje donde te pedí el *monto total*.", parse_mode="Markdown")
         return MONTO
 
     try:
-        context.user_data["monto"] = float(update.message.text.replace("$", "").replace(",", ""))
+        draft.monto = validate_amount_text(update.message.text)
     except ValueError:
-        await update.message.reply_text("Por favor, escribe un monto válido (ej. 250.00)")
+        await update.message.reply_text("⚠️ No entendí ese monto.\n\nEscríbelo como número, por ejemplo: *250.00*", parse_mode="Markdown")
         return MONTO
 
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in OPCIONES_PAGADORES]
-    keyboard.append([InlineKeyboardButton("Otro", callback_data="Otro")])
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="👤 ¿Quién pagó?", reply_markup=InlineKeyboardMarkup(keyboard))
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="👤 ¿*Quién pagó* este gasto?",
+        parse_mode="Markdown",
+        reply_markup=build_name_keyboard(OPCIONES_PAGADORES, include_other=True),
+    )
     return PAGADOR
 
 # Recibimos pagador y preguntamos por deudores
@@ -59,53 +84,44 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     opcion = query.data
+    draft = get_expense_draft(context)
 
     if opcion == "Otro":
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el nombre del pagador:")
+        await finish_callback(query, "✅ Opción manual seleccionada.")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el *nombre del pagador*.", parse_mode="Markdown")
         return NOMBRE_PAGADOR_MANUAL
     else:
-        context.user_data["pagador"] = opcion
-        context.user_data["deudores"] = []
-        context.user_data["extra_deudores"] = []
-        context.user_data["primer_pregunta_deudores"] = True
-
-        nombres_disponibles = [n for n in OPCIONES_DEUDORES if n != opcion]
-
-        keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-        fila_extra = [InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"), InlineKeyboardButton("Otro", callback_data="Otro")]
-
-        keyboard.append(fila_extra)
+        draft.pagador = opcion
+        draft.deudores.clear()
+        draft.primer_pregunta_deudores = True
+        await finish_callback(query, f"✅ Pagó: *{opcion}*")
 
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="💸 ¿Quiénes deben pagar?",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            text="💸 ¿*Quiénes deben pagar* este gasto?",
+            parse_mode="Markdown",
+            reply_markup=build_deudores_keyboard(opcion, [], show_done=False),
         )
 
         return DEUDORES
 # Recibimos deudor manual y preguntamos por deudores
 async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    pagador = update.message.text.strip()
-    if not pagador:
-        await update.message.reply_text("❌ Nombre no válido. Intenta nuevamente.")
+    draft = get_expense_draft(context)
+    try:
+        pagador = validate_required_name(update.message.text)
+    except ValueError:
+        await update.message.reply_text("❌ Ese nombre no me sirve.\n\nEscríbelo de nuevo, por favor.")
         return NOMBRE_PAGADOR_MANUAL
 
-    context.user_data["pagador"] = pagador
-    context.user_data["deudores"] = []
-    context.user_data["extra_deudores"] = []
-    nombres_disponibles = [n for n in OPCIONES_DEUDORES if n != pagador]
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-    keyboard.append([
-        InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"),
-        InlineKeyboardButton("Otro", callback_data="Otro"),
-        InlineKeyboardButton("Listo", callback_data="Listo")
-    ])
+    draft.pagador = pagador
+    draft.deudores.clear()
+    draft.primer_pregunta_deudores = False
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"👤 Nuevo pagador registrado: *{pagador}*\n\n💸 ¿Quiénes deben pagar?",
+        text=f"👤 Pagador registrado: *{pagador}*\n\n💸 ¿*Quiénes deben pagar* este gasto?",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=build_deudores_keyboard(pagador, [], show_done=False),
     )
     return DEUDORES
 
@@ -114,90 +130,75 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    pagador = context.user_data["pagador"]
-    deudores = context.user_data.get("deudores", [])
+    draft = get_expense_draft(context)
+    pagador = draft.pagador
+    deudores = draft.deudores
 
     if data == "Listo":
-        keyboard = [
-            [InlineKeyboardButton("Sí ✅", callback_data="si")],
-            [InlineKeyboardButton("No ❌", callback_data="no")]
-        ]
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="¿El pagador también es deudor?", reply_markup=InlineKeyboardMarkup(keyboard))
+        await finish_callback(query, "✅ *Selección de deudores cerrada.*")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🤔 ¿El *pagador* también entra en la división?",
+            parse_mode="Markdown",
+            reply_markup=build_include_pagador_keyboard(),
+        )
         return INCLUIR_PAGADOR
 
     elif data == "Los 4 de siempre":
-        grupo = ["Óscar", "Yetro", "Bichos"]
-        grupo_final = [n for n in grupo if n != pagador]
-        context.user_data["deudores"] = list(set(deudores + grupo_final))
-        context.user_data["primer_pregunta_deudores"] = False
-        mensaje = f"✅ Se agregaron: {', '.join(grupo_final)}\n\n"
+        grupo_final = build_fixed_group(pagador)
+        draft.add_deudores(grupo_final)
+        mensaje = f"✅ Se agregaron: *{', '.join(grupo_final)}*\n\n"
+        await finish_callback(query, f"✅ Deudores agregados: *{', '.join(grupo_final)}*")
 
     elif data == "Otro":
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el nombre del otro deudor:")
+        await finish_callback(query, "✅ Opción manual seleccionada.")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el *nombre del otro deudor*.", parse_mode="Markdown")
         return NOMBRE_DEUDOR_EXTRA
 
     else:
-        if data not in deudores and data != pagador:
-            context.user_data.setdefault("deudores", []).append(data)
-            context.user_data["primer_pregunta_deudores"] = False
+        if draft.add_deudor(data):
             mensaje = f"✅ *{data}* fue agregado como deudor.\n\n"
+            await finish_callback(query, f"✅ Deudor agregado: *{data}*")
         else:
             mensaje = f"⚠️ *{data}* ya fue agregado o es el pagador.\n\n"
+            await finish_callback(query, f"⚠️ *{data}* ya estaba agregado o es el pagador.")
 
-    nombres_disponibles = [n for n in OPCIONES_DEUDORES if n not in context.user_data.get("deudores", []) and n != pagador]
-
-    grupo_4 = {"Óscar", "Yetro", "Bichos"}
-    ya_elegidos = set(context.user_data.get("deudores", []))
-    mostrar_todos = grupo_4.isdisjoint(ya_elegidos)
-
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-
-    fila_extra = []
-    if mostrar_todos:
-        fila_extra.append(InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"))
-    fila_extra.append(InlineKeyboardButton("Otro", callback_data="Otro"))
-
-    if not context.user_data.get("primer_pregunta_deudores", True):
-        fila_extra.append(InlineKeyboardButton("Listo", callback_data="Listo"))
-
-    keyboard.append(fila_extra)
-
-    mensaje += "Sigue eligiendo deudores o presiona *Listo* para continuar."
+    mensaje += "Puedes seguir eligiendo deudores o tocar *Listo* para continuar."
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=mensaje,
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=build_deudores_keyboard(
+            pagador,
+            draft.deudores,
+            show_done=not draft.primer_pregunta_deudores,
+        ),
     )
     return DEUDORES
 
 # Recibimos deudor extra manualmente y volvemos a preguntar por deudores
 async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nuevo = update.message.text.strip()
-    if nuevo:
-        if nuevo not in context.user_data.get("deudores", []):
-            context.user_data.setdefault("deudores", []).append(nuevo)
+    draft = get_expense_draft(context)
+    try:
+        nuevo = validate_required_name(update.message.text)
+        if draft.add_deudor(nuevo):
             mensaje = f"✅ *{nuevo}* fue agregado como deudor.\n\n"
         else:
             mensaje = f"⚠️ *{nuevo}* ya está en la lista de deudores.\n\n"
-    else:
-        mensaje = "❌ Nombre no válido. Intenta nuevamente.\n\n"
+    except ValueError:
+        mensaje = "❌ Ese nombre no me sirve.\n\n"
 
-    mensaje += "Sigue eligiendo deudores o presiona *Listo* para continuar."
-
-    nombres_faltantes = [n for n in OPCIONES_DEUDORES if n not in context.user_data.get("deudores", [])]
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_faltantes]
-    keyboard.append([
-        InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"),
-        InlineKeyboardButton("Otro", callback_data="Otro"),
-        InlineKeyboardButton("Listo", callback_data="Listo")
-    ])
+    mensaje += "Puedes seguir eligiendo deudores o tocar *Listo* para continuar."
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=mensaje,
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=build_deudores_keyboard(
+            draft.pagador,
+            draft.deudores,
+            show_done=True,
+        ),
     )
     return DEUDORES
 
@@ -205,13 +206,21 @@ async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TY
 async def incluir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    pagador = context.user_data["pagador"]
-    if query.data == "si" and pagador not in context.user_data.get("deudores", []):
-        context.user_data.setdefault("deudores", []).append(pagador)
+    draft = get_expense_draft(context)
+    pagador = draft.pagador
+    if query.data == "si":
+        draft.include_pagador()
+        await finish_callback(query, "✅ El pagador *sí* fue incluido en la división.")
+    else:
+        await finish_callback(query, "✅ El pagador *no* fue incluido en la división.")
 
-    if pagador == "Óscar":
-        keyboard = [[InlineKeyboardButton(m, callback_data=m)] for m in METODOS]
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="🏦 ¿Con qué método pagó Óscar?", reply_markup=InlineKeyboardMarkup(keyboard))
+    if should_ask_payment_method(pagador):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🏦 ¿Con qué *método de pago* pagó *Óscar*?",
+            parse_mode="Markdown",
+            reply_markup=build_payment_method_keyboard(METODOS),
+        )
         return METODO_PAGO
 
     return await mostrar_confirmacion(update, context)
@@ -220,27 +229,25 @@ async def incluir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def recibir_metodo_pago(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    context.user_data["metodo_pago"] = query.data
+    draft = get_expense_draft(context)
+    draft.metodo_pago = query.data
+    await finish_callback(query, f"✅ Método de pago: *{query.data}*")
     return await mostrar_confirmacion(update, context)
 
 # Mostramos el resumen del gasto y pedimos confirmación o cancelación
 async def mostrar_confirmacion(update, context):
-    descripcion = context.user_data.get("descripcion","")
-    monto = context.user_data.get("monto",0)
-    pagador = context.user_data.get("pagador","")
-    deudores = context.user_data.get("deudores",[])
-    metodo = context.user_data.get("metodo_pago", None)
-
-    total_personas = sum(2 if d in ["Bichos", "Fabos"] else 1 for d in deudores) or 1
-    monto_por_persona = round(monto / total_personas, 2)
-
-    resumen = f"📌 *{descripcion}*\n💰 Monto total: ${monto:,.2f}\n👤 Pagó: {pagador}\n"
-    if metodo:
-        resumen += f"🏦 Método: {metodo}\n"
-    resumen += "💸 Deudores:\n"
-    for d in deudores:
-        unidades = 2 if d in ["Bichos", "Fabos"] else 1
-        resumen += f"• {d} paga ${monto_por_persona * unidades:,.2f}\n"
+    draft = get_expense_draft(context)
+    if not draft.movement_id:
+        draft.movement_id = generate_movement_id()
+    resumen = build_expense_summary(
+        draft.descripcion,
+        draft.monto,
+        draft.pagador,
+        draft.deudores,
+        draft.metodo_pago or None,
+    )
+    resumen = resumen.replace("📌", "🧾 *Resumen del gasto*\n\n📌", 1)
+    resumen += "\n¿Quieres *registrar* este gasto?"
 
     keyboard = [
         [InlineKeyboardButton("Confirmar ✅", callback_data="confirmar")],
@@ -253,23 +260,36 @@ async def mostrar_confirmacion(update, context):
 async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    draft = get_expense_draft(context)
 
-    sheet = init_gsheet()
+    if draft.processed:
+        await finish_callback(query, "⚠️ Este gasto *ya había sido registrado*.")
+        return ConversationHandler.END
+
+    draft.processed = True
+
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    descripcion = context.user_data.get("descripcion","")
-    monto = context.user_data.get("monto",0)
-    pagador = context.user_data.get("pagador","")
-    metodo = context.user_data.get("metodo_pago","")
-    deudores = context.user_data.get("deudores",[])
-    total_personas = sum(2 if d in ["Bichos", "Fabos"] else 1 for d in deudores) or 1
-    monto_por_persona = round(monto / total_personas, 2)
+    movements = build_expense_rows(
+        draft.descripcion,
+        draft.monto,
+        draft.pagador,
+        draft.deudores,
+        now,
+        draft.metodo_pago,
+        draft.movement_id or generate_movement_id(),
+    )
+    try:
+        append_movements(movements)
+    except RepositoryError:
+        draft.processed = False
+        await finish_callback(query, "❌ No pude guardar el gasto en este momento.\n\nIntenta de nuevo en unos minutos.")
+        return CONFIRMACION
 
-    for d in deudores:
-        unidades = 2 if d in ["Bichos", "Fabos"] else 1
-        row = [descripcion, monto_por_persona * unidades, d, pagador, now]
-        if pagador == "Óscar":
-            row.append(metodo)
-        sheet.append_row(row)
+    await finish_callback(query, "✅ *Confirmación cerrada.*")
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Gasto registrado exitosamente! ✅")
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="✅ *Gasto registrado correctamente.*",
+        parse_mode="Markdown",
+    )
     return ConversationHandler.END
