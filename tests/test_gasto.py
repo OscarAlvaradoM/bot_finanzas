@@ -6,13 +6,27 @@ from domain.errors import RepositoryError
 from domain.models import ExpenseDraft, Movement
 from tests.helpers import FakeBot, FakeCallbackQuery, FakeContext, FakeUpdate
 
-from config import CONFIRMACION
-from handlers.gasto import confirmar_gasto, mostrar_confirmacion
+from config import CONFIRMACION, DEUDORES
+from handlers.gasto import confirmar_gasto, mostrar_confirmacion, recibir_pagador
 from services.finance_service import build_expense_rows
 from telegram.ext import ConversationHandler
 
 
 class GastoTests(unittest.TestCase):
+    def test_recibir_pagador_cierra_mensaje_viejo_y_avanza(self):
+        bot = FakeBot()
+        update = FakeUpdate(callback_query=FakeCallbackQuery("Óscar"))
+        context = FakeContext(
+            bot=bot,
+            user_data={"expense_draft": ExpenseDraft()},
+        )
+
+        state = asyncio.run(recibir_pagador(update, context))
+
+        self.assertEqual(state, DEUDORES)
+        self.assertEqual(update.callback_query.edits[0]["text"], "✅ Pagó: Óscar")
+        self.assertEqual(bot.sent_messages[0]["text"], "💸 ¿Quiénes deben pagar?")
+
     def test_mostrar_confirmacion_reparte_por_pesos(self):
         bot = FakeBot()
         context = FakeContext(

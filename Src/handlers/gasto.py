@@ -86,12 +86,14 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_expense_draft(context)
 
     if opcion == "Otro":
+        await finish_callback(query, "✍️ Escribe el nombre del pagador en el siguiente mensaje.")
         await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el nombre del pagador:")
         return NOMBRE_PAGADOR_MANUAL
     else:
         draft.pagador = opcion
         draft.deudores.clear()
         draft.primer_pregunta_deudores = True
+        await finish_callback(query, f"✅ Pagó: {opcion}")
 
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -131,6 +133,7 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
     deudores = draft.deudores
 
     if data == "Listo":
+        await finish_callback(query, "✅ Selección de deudores cerrada.")
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="¿El pagador también es deudor?",
@@ -142,16 +145,20 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
         grupo_final = build_fixed_group(pagador)
         draft.add_deudores(grupo_final)
         mensaje = f"✅ Se agregaron: {', '.join(grupo_final)}\n\n"
+        await finish_callback(query, f"✅ Deudores agregados: {', '.join(grupo_final)}")
 
     elif data == "Otro":
+        await finish_callback(query, "✍️ Escribe el nombre del otro deudor en el siguiente mensaje.")
         await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el nombre del otro deudor:")
         return NOMBRE_DEUDOR_EXTRA
 
     else:
         if draft.add_deudor(data):
             mensaje = f"✅ *{data}* fue agregado como deudor.\n\n"
+            await finish_callback(query, f"✅ Deudor agregado: {data}")
         else:
             mensaje = f"⚠️ *{data}* ya fue agregado o es el pagador.\n\n"
+            await finish_callback(query, f"⚠️ {data} ya estaba agregado o es el pagador.")
 
     mensaje += "Sigue eligiendo deudores o presiona *Listo* para continuar."
     await context.bot.send_message(
@@ -200,6 +207,9 @@ async def incluir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pagador = draft.pagador
     if query.data == "si":
         draft.include_pagador()
+        await finish_callback(query, "✅ El pagador también fue incluido como deudor.")
+    else:
+        await finish_callback(query, "✅ El pagador no fue incluido como deudor.")
 
     if should_ask_payment_method(pagador):
         await context.bot.send_message(
@@ -217,6 +227,7 @@ async def recibir_metodo_pago(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     draft = get_expense_draft(context)
     draft.metodo_pago = query.data
+    await finish_callback(query, f"✅ Método de pago: {query.data}")
     return await mostrar_confirmacion(update, context)
 
 # Mostramos el resumen del gasto y pedimos confirmación o cancelación
