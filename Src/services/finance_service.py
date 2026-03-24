@@ -144,13 +144,18 @@ def build_balance_summary(movements: list[Movement]) -> str:
 def get_net_balances(movements: list[Movement]) -> dict[str, dict[str, float]]:
     balance = build_balance_map(movements)
     net_balances: dict[str, dict[str, float]] = {}
+    people = sorted(balance.keys())
 
-    for deudor, acreedores in balance.items():
-        for acreedor, monto in acreedores.items():
-            contraparte = balance.get(acreedor, {}).get(deudor, 0)
-            neto = round(monto - contraparte, 2)
+    for index, person_a in enumerate(people):
+        for person_b in people[index + 1 :]:
+            amount_ab = balance.get(person_a, {}).get(person_b, 0)
+            amount_ba = balance.get(person_b, {}).get(person_a, 0)
+            neto = round(amount_ab - amount_ba, 2)
+
             if neto > 0:
-                net_balances.setdefault(deudor, {})[acreedor] = neto
+                net_balances.setdefault(person_a, {})[person_b] = neto
+            elif neto < 0:
+                net_balances.setdefault(person_b, {})[person_a] = round(abs(neto), 2)
 
     return net_balances
 
@@ -165,6 +170,15 @@ def get_creditors_for_debtor(movements: list[Movement], deudor: str) -> list[str
 
 def get_debt_amount(movements: list[Movement], deudor: str, acreedor: str) -> float:
     return get_net_balances(movements).get(deudor, {}).get(acreedor, 0.0)
+
+
+def get_balance_between_people(movements: list[Movement], person_a: str, person_b: str) -> float:
+    net_balances = get_net_balances(movements)
+    if person_b in net_balances.get(person_a, {}):
+        return net_balances[person_a][person_b]
+    if person_a in net_balances.get(person_b, {}):
+        return -net_balances[person_b][person_a]
+    return 0.0
 
 
 def get_total_debt_by_person(movements: list[Movement]) -> dict[str, float]:

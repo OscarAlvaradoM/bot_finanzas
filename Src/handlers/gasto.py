@@ -87,7 +87,7 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_expense_draft(context)
 
     if opcion == "Otro":
-        await finish_callback(query, "✍️ Escribe el *nombre del pagador* en el siguiente mensaje.")
+        await finish_callback(query, "✅ Opción manual seleccionada.")
         await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el *nombre del pagador*.", parse_mode="Markdown")
         return NOMBRE_PAGADOR_MANUAL
     else:
@@ -121,7 +121,7 @@ async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_T
         chat_id=update.effective_chat.id,
         text=f"👤 Pagador registrado: *{pagador}*\n\n💸 ¿*Quiénes deben pagar* este gasto?",
         parse_mode="Markdown",
-        reply_markup=build_deudores_keyboard(pagador, [], show_done=True),
+        reply_markup=build_deudores_keyboard(pagador, [], show_done=False),
     )
     return DEUDORES
 
@@ -151,7 +151,7 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await finish_callback(query, f"✅ Deudores agregados: *{', '.join(grupo_final)}*")
 
     elif data == "Otro":
-        await finish_callback(query, "✍️ Escribe el *nombre del otro deudor* en el siguiente mensaje.")
+        await finish_callback(query, "✅ Opción manual seleccionada.")
         await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ Escribe el *nombre del otro deudor*.", parse_mode="Markdown")
         return NOMBRE_DEUDOR_EXTRA
 

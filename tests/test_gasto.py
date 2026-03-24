@@ -6,13 +6,34 @@ from domain.errors import RepositoryError
 from domain.models import ExpenseDraft, Movement
 from tests.helpers import FakeBot, FakeCallbackQuery, FakeContext, FakeUpdate
 
-from config import CONFIRMACION, DEUDORES
-from handlers.gasto import confirmar_gasto, mostrar_confirmacion, recibir_pagador
+from config import CONFIRMACION, DEUDORES, NOMBRE_DEUDOR_EXTRA, NOMBRE_PAGADOR_MANUAL
+from handlers.gasto import (
+    confirmar_gasto,
+    mostrar_confirmacion,
+    recibir_deudores,
+    recibir_pagador,
+    recibir_pagador_manual,
+)
 from services.finance_service import build_expense_rows
 from telegram.ext import ConversationHandler
 
 
 class GastoTests(unittest.TestCase):
+    def test_recibir_pagador_otro_no_duplica_mensaje(self):
+        bot = FakeBot()
+        update = FakeUpdate(callback_query=FakeCallbackQuery("Otro"))
+        context = FakeContext(
+            bot=bot,
+            user_data={"expense_draft": ExpenseDraft()},
+        )
+
+        state = asyncio.run(recibir_pagador(update, context))
+
+        self.assertEqual(state, NOMBRE_PAGADOR_MANUAL)
+        self.assertEqual(update.callback_query.edits[0]["text"], "✅ Opción manual seleccionada.")
+        self.assertEqual(len(bot.sent_messages), 1)
+        self.assertEqual(bot.sent_messages[0]["text"], "✍️ Escribe el *nombre del pagador*.")
+
     def test_recibir_pagador_cierra_mensaje_viejo_y_avanza(self):
         bot = FakeBot()
         update = FakeUpdate(callback_query=FakeCallbackQuery("Óscar"))
@@ -26,6 +47,41 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(state, DEUDORES)
         self.assertEqual(update.callback_query.edits[0]["text"], "✅ Pagó: *Óscar*")
         self.assertEqual(bot.sent_messages[0]["text"], "💸 ¿*Quiénes deben pagar* este gasto?")
+
+    def test_recibir_pagador_manual_no_muestra_listo_sin_deudores(self):
+        bot = FakeBot()
+        update = FakeUpdate(message=type("Msg", (), {"text": "Carlos", "reply_text": None})())
+        context = FakeContext(
+            bot=bot,
+            user_data={"expense_draft": ExpenseDraft()},
+        )
+
+        async def fake_reply_text(text, **kwargs):
+            bot.sent_messages.append({"text": text, **kwargs})
+
+        update.message.reply_text = fake_reply_text
+
+        state = asyncio.run(recibir_pagador_manual(update, context))
+
+        self.assertEqual(state, DEUDORES)
+        keyboard = bot.sent_messages[0]["reply_markup"].keyboard
+        labels = [button.text for row in keyboard for button in row]
+        self.assertNotIn("Listo", labels)
+
+    def test_recibir_deudores_otro_no_duplica_mensaje(self):
+        bot = FakeBot()
+        update = FakeUpdate(callback_query=FakeCallbackQuery("Otro"))
+        context = FakeContext(
+            bot=bot,
+            user_data={"expense_draft": ExpenseDraft(pagador="Óscar")},
+        )
+
+        state = asyncio.run(recibir_deudores(update, context))
+
+        self.assertEqual(state, NOMBRE_DEUDOR_EXTRA)
+        self.assertEqual(update.callback_query.edits[0]["text"], "✅ Opción manual seleccionada.")
+        self.assertEqual(len(bot.sent_messages), 1)
+        self.assertEqual(bot.sent_messages[0]["text"], "✍️ Escribe el *nombre del otro deudor*.")
 
     def test_mostrar_confirmacion_reparte_por_pesos(self):
         bot = FakeBot()

@@ -13,6 +13,7 @@ from services.finance_service import (
     build_payment_row,
     build_payment_summary,
     generate_movement_id,
+    get_balance_between_people,
     get_creditors_for_debtor,
     get_debt_amount,
     get_people_with_debt,
@@ -229,16 +230,31 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PAGAR_CONFIRMAR
     await finish_callback(query, "✅ *Confirmación cerrada.*")
 
-    saldo_restante = None
+    balance_entre_personas = None
     try:
         movimientos_actualizados = fetch_movements()
-        saldo_restante = get_debt_amount(movimientos_actualizados, draft.pagador, draft.receptor)
+        balance_entre_personas = get_balance_between_people(
+            movimientos_actualizados,
+            draft.pagador,
+            draft.receptor,
+        )
     except RepositoryError:
-        saldo_restante = None
+        balance_entre_personas = None
 
     mensaje = "✅ *Pago registrado correctamente.*"
-    if saldo_restante is not None:
-        mensaje += f"\n\n*Saldo restante* de *{draft.pagador}* con *{draft.receptor}*: *${saldo_restante:,.2f}*"
+    if balance_entre_personas is not None:
+        if balance_entre_personas > 0:
+            mensaje += (
+                f"\n\n*Saldo restante* de *{draft.pagador}* con *{draft.receptor}*: "
+                f"*${balance_entre_personas:,.2f}*"
+            )
+        elif balance_entre_personas < 0:
+            mensaje += (
+                f"\n\nAhora *{draft.receptor}* le debe a *{draft.pagador}*: "
+                f"*${abs(balance_entre_personas):,.2f}*"
+            )
+        else:
+            mensaje += f"\n\n🎉 Ya no hay saldo pendiente entre *{draft.pagador}* y *{draft.receptor}*."
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text=mensaje, parse_mode="Markdown")
     return ConversationHandler.END

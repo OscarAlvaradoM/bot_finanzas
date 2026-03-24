@@ -8,7 +8,13 @@ from tests.helpers import FakeCallbackQuery, FakeContext, FakeUpdate
 
 from config import PAGAR_CONFIRMAR, PAGAR_DECISION_MONTO, PAGAR_MONTO, PAGAR_PAGADOR, PAGAR_RECEPTOR
 from handlers.pago import pagar, pagar_confirmar, pagar_decidir_monto, pagar_pagador, pagar_receptor
-from services.finance_service import build_payment_row, get_creditors_for_debtor, get_debt_amount, get_people_with_debt
+from services.finance_service import (
+    build_payment_row,
+    get_balance_between_people,
+    get_creditors_for_debtor,
+    get_debt_amount,
+    get_people_with_debt,
+)
 from telegram.ext import ConversationHandler
 
 
@@ -23,6 +29,15 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(get_people_with_debt(movements), ["Óscar"])
         self.assertEqual(get_creditors_for_debtor(movements, "Óscar"), ["Judith", "Yetro"])
         self.assertEqual(get_debt_amount(movements, "Óscar", "Yetro"), 350.0)
+
+    def test_get_balance_between_people_invierte_deuda_si_hay_sobrepago(self):
+        movements = [
+            Movement("Cena", 100.0, "Óscar", "Yetro", "2026-03-23 10:00:00"),
+            Movement("Pago", -150.0, "Óscar", "Yetro", "2026-03-23 11:00:00"),
+        ]
+
+        self.assertEqual(get_balance_between_people(movements, "Óscar", "Yetro"), -50.0)
+        self.assertEqual(get_debt_amount(movements, "Yetro", "Óscar"), 50.0)
 
     def test_pagar_muestra_pagadores_con_deuda_y_otro(self):
         bot_movements = [Movement("Cena", 500.0, "Óscar", "Yetro", "2026-03-23 10:00:00")]
@@ -109,7 +124,10 @@ class PagoTests(unittest.TestCase):
 
         with patch("handlers.pago.append_movement") as mocked_append_movement, patch(
             "handlers.pago.fetch_movements",
-            return_value=[Movement("Pago", -250.0, "Óscar", "Yetro", "2026-03-23 11:00:00")],
+            return_value=[
+                Movement("Cena", 500.0, "Óscar", "Yetro", "2026-03-23 10:00:00"),
+                Movement("Pago", -250.0, "Óscar", "Yetro", "2026-03-23 11:00:00"),
+            ],
         ):
             state = asyncio.run(pagar_confirmar(update, context))
 
@@ -127,6 +145,31 @@ class PagoTests(unittest.TestCase):
             update.callback_query.edits[0]["text"],
             "✅ *Confirmación cerrada.*",
         )
+
+    def test_pagar_confirmar_muestra_deuda_invertida_si_hay_sobrepago(self):
+        update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar_pago"))
+        context = FakeContext(
+            user_data={
+                "payment_draft": PaymentDraft(
+                    pagador="Óscar",
+                    receptor="Yetro",
+                    monto=150.0,
+                    movement_id="pago-123",
+                ),
+            }
+        )
+
+        with patch("handlers.pago.append_movement"), patch(
+            "handlers.pago.fetch_movements",
+            return_value=[
+                Movement("Cena", 100.0, "Óscar", "Yetro", "2026-03-23 10:00:00"),
+                Movement("Pago", -150.0, "Óscar", "Yetro", "2026-03-23 11:00:00"),
+            ],
+        ):
+            state = asyncio.run(pagar_confirmar(update, context))
+
+        self.assertEqual(state, ConversationHandler.END)
+        self.assertIn("Ahora *Yetro* le debe a *Óscar*: *$50.00*", context.bot.sent_messages[0]["text"])
 
     def test_pagar_confirmar_no_registra_dos_veces(self):
         update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar_pago"))
