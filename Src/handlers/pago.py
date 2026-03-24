@@ -250,7 +250,8 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         elif balance_entre_personas < 0:
             mensaje += (
-                f"\n\nAhora *{draft.receptor}* le debe a *{draft.pagador}*: "
+                f"\n\n⚠️ *Hubo un sobrepago.*\n"
+                f"Ahora *{draft.receptor}* le debe a *{draft.pagador}*: "
                 f"*${abs(balance_entre_personas):,.2f}*"
             )
         else:
