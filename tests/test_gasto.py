@@ -58,9 +58,39 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(movements[0].deudor, "Yetro")
         self.assertEqual(movements[0].acreedor, "Óscar")
         self.assertEqual(movements[0].metodo_pago, "Tarjeta")
+        self.assertTrue(movements[0].movement_id)
+        self.assertEqual(movements[0].movement_id, movements[1].movement_id)
         self.assertEqual(movements[1].monto, 200.0)
         self.assertEqual(movements[1].deudor, "Fabos")
         self.assertEqual(context.bot.sent_messages[0]["text"], "¡Gasto registrado exitosamente! ✅")
+        self.assertEqual(
+            update.callback_query.edits[0]["text"],
+            "✅ Gasto registrado. Esta confirmación ya quedó cerrada.",
+        )
+
+    def test_confirmar_gasto_no_registra_dos_veces(self):
+        update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar"))
+        context = FakeContext(
+            user_data={
+                "descripcion": "Super",
+                "monto": 300.0,
+                "pagador": "Óscar",
+                "deudores": ["Yetro", "Fabos"],
+                "metodo_pago": "Tarjeta",
+            }
+        )
+
+        with patch("handlers.gasto.append_movements") as mocked_append_movements:
+            first_state = asyncio.run(confirmar_gasto(update, context))
+            second_state = asyncio.run(confirmar_gasto(update, context))
+
+        self.assertEqual(first_state, ConversationHandler.END)
+        self.assertEqual(second_state, ConversationHandler.END)
+        self.assertEqual(mocked_append_movements.call_count, 1)
+        self.assertEqual(
+            update.callback_query.edits[-1]["text"],
+            "⚠️ Este gasto ya fue registrado anteriormente.",
+        )
 
     def test_build_expense_rows_reparte_por_pesos(self):
         movements = build_expense_rows(
@@ -75,7 +105,7 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(
             movements,
             [
-                Movement("Cena", 100.0, "Yetro", "Óscar", "2026-03-23 10:00:00", "Tarjeta"),
-                Movement("Cena", 200.0, "Fabos", "Óscar", "2026-03-23 10:00:00", "Tarjeta"),
+                Movement("Cena", 100.0, "Yetro", "Óscar", "2026-03-23 10:00:00", "Tarjeta", ""),
+                Movement("Cena", 200.0, "Fabos", "Óscar", "2026-03-23 10:00:00", "Tarjeta", ""),
             ],
         )

@@ -6,6 +6,11 @@ from config import (
     INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL,
     OPCIONES_PAGADORES, METODOS
 )
+from handlers.callback_guard import (
+    finish_callback,
+    mark_callback_processed,
+    was_callback_processed,
+)
 from handlers.gasto_ui import (
     build_deudores_keyboard,
     build_include_pagador_keyboard,
@@ -18,6 +23,7 @@ from services.finance_service import (
     build_expense_rows,
     build_expense_summary,
     build_fixed_group,
+    generate_movement_id,
     parse_amount,
 )
 
@@ -215,6 +221,7 @@ async def mostrar_confirmacion(update, context):
     pagador = context.user_data.get("pagador", "")
     deudores = context.user_data.get("deudores", [])
     metodo = context.user_data.get("metodo_pago")
+    context.user_data.setdefault("gasto_movement_id", generate_movement_id())
     resumen = build_expense_summary(descripcion, monto, pagador, deudores, metodo)
 
     keyboard = [
@@ -229,6 +236,12 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    if was_callback_processed(context, "gasto_confirmado"):
+        await finish_callback(query, "⚠️ Este gasto ya fue registrado anteriormente.")
+        return ConversationHandler.END
+
+    mark_callback_processed(context, "gasto_confirmado")
+
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     movements = build_expense_rows(
         context.user_data.get("descripcion", ""),
@@ -237,8 +250,10 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.get("deudores", []),
         now,
         context.user_data.get("metodo_pago", ""),
+        context.user_data.setdefault("gasto_movement_id", generate_movement_id()),
     )
     append_movements(movements)
+    await finish_callback(query, "✅ Gasto registrado. Esta confirmación ya quedó cerrada.")
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Gasto registrado exitosamente! ✅")
     return ConversationHandler.END

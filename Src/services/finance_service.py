@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
+import uuid
 from domain.models import Movement
 from domain.rules import DOUBLE_WEIGHT_PEOPLE, FIXED_GROUP_MEMBERS
 
 
 def parse_amount(raw_value) -> float:
     return float(str(raw_value).replace("$", "").replace(",", ""))
+
+
+def generate_movement_id() -> str:
+    return uuid.uuid4().hex
 
 
 def get_person_units(person_name: str) -> int:
@@ -59,6 +64,7 @@ def build_expense_rows(
     deudores: list[str],
     timestamp: str,
     metodo: str = "",
+    movement_id: str = "",
 ) -> list[Movement]:
     movements = []
     for deudor, deuda in calculate_debtor_amounts(monto, deudores):
@@ -70,6 +76,7 @@ def build_expense_rows(
                 acreedor=pagador,
                 timestamp=timestamp,
                 metodo_pago=metodo,
+                movement_id=movement_id,
             )
         )
     return movements
@@ -85,8 +92,14 @@ def build_payment_summary(pagador: str, receptor: str, monto: float) -> str:
     )
 
 
-def build_payment_row(pagador: str, receptor: str, monto: float, timestamp: str) -> Movement:
-    return Movement("Pago", -monto, pagador, receptor, timestamp, "")
+def build_payment_row(
+    pagador: str,
+    receptor: str,
+    monto: float,
+    timestamp: str,
+    movement_id: str = "",
+) -> Movement:
+    return Movement("Pago", -monto, pagador, receptor, timestamp, "", movement_id)
 
 
 def build_balance_map(movements: list[Movement]) -> dict[str, dict[str, float]]:

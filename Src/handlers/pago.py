@@ -5,8 +5,13 @@ from config import (
     PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 import datetime
+from handlers.callback_guard import (
+    finish_callback,
+    mark_callback_processed,
+    was_callback_processed,
+)
 from repositories.sheets_repository import append_movement
-from services.finance_service import build_payment_row, build_payment_summary, parse_amount
+from services.finance_service import build_payment_row, build_payment_summary, generate_movement_id, parse_amount
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -93,6 +98,7 @@ async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pagador = context.user_data["pagador"]
     receptor = context.user_data["receptor"]
+    context.user_data.setdefault("pago_movement_id", generate_movement_id())
 
     resumen = build_payment_summary(pagador, receptor, monto)
 
@@ -114,12 +120,27 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    if was_callback_processed(context, "pago_confirmado"):
+        await finish_callback(query, "⚠️ Este pago ya fue registrado anteriormente.")
+        return ConversationHandler.END
+
+    mark_callback_processed(context, "pago_confirmado")
+
     pagador = context.user_data["pagador"]
     receptor = context.user_data["receptor"]
     monto = context.user_data["monto"]
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_movement(build_payment_row(pagador, receptor, monto, timestamp))
+    append_movement(
+        build_payment_row(
+            pagador,
+            receptor,
+            monto,
+            timestamp,
+            context.user_data.setdefault("pago_movement_id", generate_movement_id()),
+        )
+    )
+    await finish_callback(query, "✅ Pago registrado. Esta confirmación ya quedó cerrada.")
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Pago registrado exitosamente! ✅")
     return ConversationHandler.END

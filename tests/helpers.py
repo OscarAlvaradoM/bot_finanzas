@@ -126,12 +126,25 @@ class FakeContext:
 
 
 class FakeSheet:
-    def __init__(self, *, records=None):
+    def __init__(self, *, records=None, headers=None):
         self.records = records or []
         self.rows = []
+        self.headers = headers or ["Descripcion", "Monto", "Deudor", "Prestador", "Fecha", "Metodo"]
 
     def get_all_records(self):
         return self.records
 
     def append_row(self, row):
         self.rows.append(row)
+
+    def row_values(self, index):
+        if index == 1:
+            return self.headers
+        return []
+
+    def update_cell(self, row, col, value):
+        if row != 1:
+            return
+        while len(self.headers) < col:
+            self.headers.append("")
+        self.headers[col - 1] = value
