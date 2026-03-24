@@ -6,7 +6,13 @@ from config import (
     INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL,
     OPCIONES_PAGADORES, OPCIONES_DEUDORES, METODOS
 )
-from sheets import init_gsheet
+from repositories.sheets_repository import append_rows
+from services.finance_service import (
+    build_expense_rows,
+    build_expense_summary,
+    build_fixed_group,
+    parse_amount,
+)
 
 # Al invocar el comando de /gasto
 # Preguntamos por la descripción del gasto
@@ -44,7 +50,7 @@ async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MONTO
 
     try:
-        context.user_data["monto"] = float(update.message.text.replace("$", "").replace(",", ""))
+        context.user_data["monto"] = parse_amount(update.message.text)
     except ValueError:
         await update.message.reply_text("Por favor, escribe un monto válido (ej. 250.00)")
         return MONTO
@@ -126,8 +132,7 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return INCLUIR_PAGADOR
 
     elif data == "Los 4 de siempre":
-        grupo = ["Óscar", "Yetro", "Bichos"]
-        grupo_final = [n for n in grupo if n != pagador]
+        grupo_final = build_fixed_group(pagador)
         context.user_data["deudores"] = list(set(deudores + grupo_final))
         context.user_data["primer_pregunta_deudores"] = False
         mensaje = f"✅ Se agregaron: {', '.join(grupo_final)}\n\n"
@@ -225,22 +230,12 @@ async def recibir_metodo_pago(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # Mostramos el resumen del gasto y pedimos confirmación o cancelación
 async def mostrar_confirmacion(update, context):
-    descripcion = context.user_data.get("descripcion","")
-    monto = context.user_data.get("monto",0)
-    pagador = context.user_data.get("pagador","")
-    deudores = context.user_data.get("deudores",[])
-    metodo = context.user_data.get("metodo_pago", None)
-
-    total_personas = sum(2 if d in ["Bichos", "Fabos"] else 1 for d in deudores) or 1
-    monto_por_persona = round(monto / total_personas, 2)
-
-    resumen = f"📌 *{descripcion}*\n💰 Monto total: ${monto:,.2f}\n👤 Pagó: {pagador}\n"
-    if metodo:
-        resumen += f"🏦 Método: {metodo}\n"
-    resumen += "💸 Deudores:\n"
-    for d in deudores:
-        unidades = 2 if d in ["Bichos", "Fabos"] else 1
-        resumen += f"• {d} paga ${monto_por_persona * unidades:,.2f}\n"
+    descripcion = context.user_data.get("descripcion", "")
+    monto = context.user_data.get("monto", 0)
+    pagador = context.user_data.get("pagador", "")
+    deudores = context.user_data.get("deudores", [])
+    metodo = context.user_data.get("metodo_pago")
+    resumen = build_expense_summary(descripcion, monto, pagador, deudores, metodo)
 
     keyboard = [
         [InlineKeyboardButton("Confirmar ✅", callback_data="confirmar")],
@@ -254,22 +249,16 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    sheet = init_gsheet()
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    descripcion = context.user_data.get("descripcion","")
-    monto = context.user_data.get("monto",0)
-    pagador = context.user_data.get("pagador","")
-    metodo = context.user_data.get("metodo_pago","")
-    deudores = context.user_data.get("deudores",[])
-    total_personas = sum(2 if d in ["Bichos", "Fabos"] else 1 for d in deudores) or 1
-    monto_por_persona = round(monto / total_personas, 2)
-
-    for d in deudores:
-        unidades = 2 if d in ["Bichos", "Fabos"] else 1
-        row = [descripcion, monto_por_persona * unidades, d, pagador, now]
-        if pagador == "Óscar":
-            row.append(metodo)
-        sheet.append_row(row)
+    rows = build_expense_rows(
+        context.user_data.get("descripcion", ""),
+        context.user_data.get("monto", 0),
+        context.user_data.get("pagador", ""),
+        context.user_data.get("deudores", []),
+        now,
+        context.user_data.get("metodo_pago", ""),
+    )
+    append_rows(rows)
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Gasto registrado exitosamente! ✅")
     return ConversationHandler.END

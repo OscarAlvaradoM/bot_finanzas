@@ -5,7 +5,8 @@ from config import (
     PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 import datetime
-from sheets import init_gsheet
+from repositories.sheets_repository import append_row
+from services.finance_service import build_payment_row, build_payment_summary, parse_amount
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -83,8 +84,8 @@ async def pagar_receptor_otro(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        monto = float(update.message.text.replace("$", "").replace(",", ""))
-    except:
+        monto = parse_amount(update.message.text)
+    except ValueError:
         await update.message.reply_text("Monto inválido. Escribe un número. Ej: 250.00")
         return PAGAR_MONTO
 
@@ -93,13 +94,7 @@ async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pagador = context.user_data["pagador"]
     receptor = context.user_data["receptor"]
 
-    resumen = (
-        "📌 *Confirmar pago*\n\n"
-        f"👤 Pagador: {pagador}\n"
-        f"➡️ Receptor: {receptor}\n"
-        f"💵 Monto: ${monto:,.2f}\n\n"
-        "¿Registrar este pago?"
-    )
+    resumen = build_payment_summary(pagador, receptor, monto)
 
     keyboard = [
         [InlineKeyboardButton("Confirmar ✅", callback_data="confirmar_pago")],
@@ -119,24 +114,12 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    sheet = init_gsheet()
     pagador = context.user_data["pagador"]
     receptor = context.user_data["receptor"]
     monto = context.user_data["monto"]
 
-    # Insertar en Google Sheets como monto negativo
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    descripcion = "Pago"
-
-    row = [
-        descripcion,
-        -monto,       # NEGATIVO
-        pagador,
-        receptor,
-        timestamp,
-        ""            # Método vacío
-    ]
-    sheet.append_row(row)
+    append_row(build_payment_row(pagador, receptor, monto, timestamp))
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Pago registrado exitosamente! ✅")
     return ConversationHandler.END
