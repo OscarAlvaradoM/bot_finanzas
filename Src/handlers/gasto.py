@@ -27,8 +27,8 @@ from services.finance_service import (
     build_expense_summary,
     build_fixed_group,
     generate_movement_id,
-    parse_amount,
 )
+from services.validators import is_expected_reply, validate_amount_text, validate_required_name
 
 # Al invocar el comando de /gasto
 # Preguntamos por la descripción del gasto
@@ -45,8 +45,7 @@ async def gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Recibimos descripción del mensaje y preguntamos por monto que fue gastado
 async def recibir_descripcion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_expense_draft(context)
-    mensaje_esperado = draft.mensaje_descripcion_id
-    if update.message.reply_to_message and update.message.reply_to_message.message_id != mensaje_esperado:
+    if not is_expected_reply(update.message, draft.mensaje_descripcion_id):
         await update.message.reply_text("Por favor, responde directamente al mensaje que pregunta por la descripción del gasto.")
         return DESCRIPCION
 
@@ -62,13 +61,12 @@ async def recibir_descripcion(update: Update, context: ContextTypes.DEFAULT_TYPE
 # Recibimos monto y preguntamos por pagador
 async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_expense_draft(context)
-    mensaje_esperado = draft.mensaje_monto_id
-    if update.message.reply_to_message and update.message.reply_to_message.message_id != mensaje_esperado:
+    if not is_expected_reply(update.message, draft.mensaje_monto_id):
         await update.message.reply_text("Por favor, responde directamente al mensaje que pregunta por el monto.")
         return MONTO
 
     try:
-        draft.monto = parse_amount(update.message.text)
+        draft.monto = validate_amount_text(update.message.text)
     except ValueError:
         await update.message.reply_text("Por favor, escribe un monto válido (ej. 250.00)")
         return MONTO
@@ -105,8 +103,9 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Recibimos deudor manual y preguntamos por deudores
 async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_expense_draft(context)
-    pagador = update.message.text.strip()
-    if not pagador:
+    try:
+        pagador = validate_required_name(update.message.text)
+    except ValueError:
         await update.message.reply_text("❌ Nombre no válido. Intenta nuevamente.")
         return NOMBRE_PAGADOR_MANUAL
 
@@ -170,13 +169,13 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Recibimos deudor extra manualmente y volvemos a preguntar por deudores
 async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_expense_draft(context)
-    nuevo = update.message.text.strip()
-    if nuevo:
+    try:
+        nuevo = validate_required_name(update.message.text)
         if draft.add_deudor(nuevo):
             mensaje = f"✅ *{nuevo}* fue agregado como deudor.\n\n"
         else:
             mensaje = f"⚠️ *{nuevo}* ya está en la lista de deudores.\n\n"
-    else:
+    except ValueError:
         mensaje = "❌ Nombre no válido. Intenta nuevamente.\n\n"
 
     mensaje += "Sigue eligiendo deudores o presiona *Listo* para continuar."

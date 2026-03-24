@@ -9,7 +9,8 @@ from domain.errors import RepositoryError
 from handlers.callback_guard import finish_callback
 from handlers.conversation_state import create_payment_draft, get_payment_draft
 from repositories.sheets_repository import append_movement
-from services.finance_service import build_payment_row, build_payment_summary, generate_movement_id, parse_amount
+from services.finance_service import build_payment_row, build_payment_summary, generate_movement_id
+from services.validators import validate_amount_text, validate_required_name
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     create_payment_draft(context)
@@ -47,7 +48,11 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def pagar_pagador_otro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_payment_draft(context)
-    pagador = update.message.text
+    try:
+        pagador = validate_required_name(update.message.text)
+    except ValueError:
+        await update.message.reply_text("❌ Nombre no válido. Intenta nuevamente.")
+        return PAGAR_PAGADOR_OTRO
     draft.pagador = pagador
 
     opciones = [p for p in OPCIONES_PAGADORES if p != pagador]
@@ -80,7 +85,11 @@ async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def pagar_receptor_otro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_payment_draft(context)
-    receptor = update.message.text
+    try:
+        receptor = validate_required_name(update.message.text)
+    except ValueError:
+        await update.message.reply_text("❌ Nombre no válido. Intenta nuevamente.")
+        return PAGAR_RECEPTOR_OTRO
     draft.receptor = receptor
 
     await update.message.reply_text(
@@ -92,7 +101,7 @@ async def pagar_receptor_otro(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_payment_draft(context)
     try:
-        monto = parse_amount(update.message.text)
+        monto = validate_amount_text(update.message.text)
     except ValueError:
         await update.message.reply_text("Monto inválido. Escribe un número. Ej: 250.00")
         return PAGAR_MONTO
