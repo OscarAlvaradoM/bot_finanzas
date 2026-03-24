@@ -2,7 +2,8 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from tests.helpers import FakeBot, FakeCallbackQuery, FakeContext, FakeSheet, FakeUpdate
+from domain.models import Movement
+from tests.helpers import FakeBot, FakeCallbackQuery, FakeContext, FakeUpdate
 
 from config import CONFIRMACION
 from handlers.gasto import confirmar_gasto, mostrar_confirmacion
@@ -46,23 +47,23 @@ class GastoTests(unittest.TestCase):
             }
         )
 
-        with patch("handlers.gasto.append_rows") as mocked_append_rows:
+        with patch("handlers.gasto.append_movements") as mocked_append_movements:
             state = asyncio.run(confirmar_gasto(update, context))
 
         self.assertEqual(state, ConversationHandler.END)
-        rows = mocked_append_rows.call_args.args[0]
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0][0], "Super")
-        self.assertEqual(rows[0][1], 100.0)
-        self.assertEqual(rows[0][2], "Yetro")
-        self.assertEqual(rows[0][3], "Óscar")
-        self.assertEqual(rows[0][-1], "Tarjeta")
-        self.assertEqual(rows[1][1], 200.0)
-        self.assertEqual(rows[1][2], "Fabos")
+        movements = mocked_append_movements.call_args.args[0]
+        self.assertEqual(len(movements), 2)
+        self.assertEqual(movements[0].descripcion, "Super")
+        self.assertEqual(movements[0].monto, 100.0)
+        self.assertEqual(movements[0].deudor, "Yetro")
+        self.assertEqual(movements[0].acreedor, "Óscar")
+        self.assertEqual(movements[0].metodo_pago, "Tarjeta")
+        self.assertEqual(movements[1].monto, 200.0)
+        self.assertEqual(movements[1].deudor, "Fabos")
         self.assertEqual(context.bot.sent_messages[0]["text"], "¡Gasto registrado exitosamente! ✅")
 
     def test_build_expense_rows_reparte_por_pesos(self):
-        rows = build_expense_rows(
+        movements = build_expense_rows(
             "Cena",
             300.0,
             "Óscar",
@@ -72,9 +73,9 @@ class GastoTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            rows,
+            movements,
             [
-                ["Cena", 100.0, "Yetro", "Óscar", "2026-03-23 10:00:00", "Tarjeta"],
-                ["Cena", 200.0, "Fabos", "Óscar", "2026-03-23 10:00:00", "Tarjeta"],
+                Movement("Cena", 100.0, "Yetro", "Óscar", "2026-03-23 10:00:00", "Tarjeta"),
+                Movement("Cena", 200.0, "Fabos", "Óscar", "2026-03-23 10:00:00", "Tarjeta"),
             ],
         )

@@ -1,16 +1,17 @@
+from domain.models import Movement
 from sheets import init_gsheet
 
 
-def fetch_records() -> list[dict]:
+def fetch_movements() -> list[Movement]:
     sheet = init_gsheet()
-    return sheet.get_all_records()
+    return [Movement.from_sheet_record(record) for record in sheet.get_all_records()]
 
 
-def append_rows(rows: list[list]) -> None:
+def append_movements(movements: list[Movement]) -> None:
     sheet = init_gsheet()
-    for row in rows:
-        sheet.append_row(row)
+    for movement in movements:
+        sheet.append_row(movement.to_sheet_row())
 
 
-def append_row(row: list) -> None:
-    append_rows([row])
+def append_movement(movement: Movement) -> None:
+    append_movements([movement])

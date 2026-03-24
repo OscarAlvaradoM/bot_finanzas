@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
-
-
-DOUBLE_WEIGHT_PEOPLE = {"Bichos", "Fabos"}
-GRUPO_FIJO = ["Óscar", "Yetro", "Bichos"]
+from domain.models import Movement
+from domain.rules import DOUBLE_WEIGHT_PEOPLE, FIXED_GROUP_MEMBERS
 
 
 def parse_amount(raw_value) -> float:
@@ -16,7 +14,7 @@ def get_person_units(person_name: str) -> int:
 
 
 def build_fixed_group(pagador: str) -> list[str]:
-    return [name for name in GRUPO_FIJO if name != pagador]
+    return [name for name in FIXED_GROUP_MEMBERS if name != pagador]
 
 
 def calculate_total_units(deudores: list[str]) -> int:
@@ -61,14 +59,20 @@ def build_expense_rows(
     deudores: list[str],
     timestamp: str,
     metodo: str = "",
-) -> list[list]:
-    rows = []
+) -> list[Movement]:
+    movements = []
     for deudor, deuda in calculate_debtor_amounts(monto, deudores):
-        row = [descripcion, deuda, deudor, pagador, timestamp]
-        if pagador == "Óscar":
-            row.append(metodo)
-        rows.append(row)
-    return rows
+        movements.append(
+            Movement(
+                descripcion=descripcion,
+                monto=deuda,
+                deudor=deudor,
+                acreedor=pagador,
+                timestamp=timestamp,
+                metodo_pago=metodo,
+            )
+        )
+    return movements
 
 
 def build_payment_summary(pagador: str, receptor: str, monto: float) -> str:
@@ -81,17 +85,17 @@ def build_payment_summary(pagador: str, receptor: str, monto: float) -> str:
     )
 
 
-def build_payment_row(pagador: str, receptor: str, monto: float, timestamp: str) -> list:
-    return ["Pago", -monto, pagador, receptor, timestamp, ""]
+def build_payment_row(pagador: str, receptor: str, monto: float, timestamp: str) -> Movement:
+    return Movement("Pago", -monto, pagador, receptor, timestamp, "")
 
 
-def build_balance_map(records: list[dict]) -> dict[str, dict[str, float]]:
+def build_balance_map(movements: list[Movement]) -> dict[str, dict[str, float]]:
     balance: dict[str, dict[str, float]] = {}
 
-    for row in records:
-        deudor = row["Deudor"]
-        acreedor = row["Prestador"]
-        monto = parse_amount(row["Monto"])
+    for movement in movements:
+        deudor = movement.deudor
+        acreedor = movement.acreedor
+        monto = movement.monto
 
         balance.setdefault(deudor, {})
         balance.setdefault(acreedor, {})
@@ -109,8 +113,8 @@ def _format_currency(amount: float) -> str:
     return f"${text}"
 
 
-def build_balance_summary(records: list[dict]) -> str:
-    balance = build_balance_map(records)
+def build_balance_summary(movements: list[Movement]) -> str:
+    balance = build_balance_map(movements)
     resumen = "💳 *Saldos pendientes:*\n"
 
     for deudor, acreedores in balance.items():

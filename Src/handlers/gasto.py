@@ -4,9 +4,16 @@ import datetime
 from config import (
     DESCRIPCION, MONTO, PAGADOR, DEUDORES, NOMBRE_DEUDOR_EXTRA,
     INCLUIR_PAGADOR, METODO_PAGO, CONFIRMACION, NOMBRE_PAGADOR_MANUAL,
-    OPCIONES_PAGADORES, OPCIONES_DEUDORES, METODOS
+    OPCIONES_PAGADORES, METODOS
 )
-from repositories.sheets_repository import append_rows
+from handlers.gasto_ui import (
+    build_deudores_keyboard,
+    build_include_pagador_keyboard,
+    build_name_keyboard,
+    build_payment_method_keyboard,
+    should_ask_payment_method,
+)
+from repositories.sheets_repository import append_movements
 from services.finance_service import (
     build_expense_rows,
     build_expense_summary,
@@ -55,9 +62,11 @@ async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Por favor, escribe un monto válido (ej. 250.00)")
         return MONTO
 
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in OPCIONES_PAGADORES]
-    keyboard.append([InlineKeyboardButton("Otro", callback_data="Otro")])
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="👤 ¿Quién pagó?", reply_markup=InlineKeyboardMarkup(keyboard))
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="👤 ¿Quién pagó?",
+        reply_markup=build_name_keyboard(OPCIONES_PAGADORES, include_other=True),
+    )
     return PAGADOR
 
 # Recibimos pagador y preguntamos por deudores
@@ -75,17 +84,10 @@ async def recibir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["extra_deudores"] = []
         context.user_data["primer_pregunta_deudores"] = True
 
-        nombres_disponibles = [n for n in OPCIONES_DEUDORES if n != opcion]
-
-        keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-        fila_extra = [InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"), InlineKeyboardButton("Otro", callback_data="Otro")]
-
-        keyboard.append(fila_extra)
-
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="💸 ¿Quiénes deben pagar?",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=build_deudores_keyboard(opcion, [], show_done=False),
         )
 
         return DEUDORES
@@ -99,19 +101,12 @@ async def recibir_pagador_manual(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["pagador"] = pagador
     context.user_data["deudores"] = []
     context.user_data["extra_deudores"] = []
-    nombres_disponibles = [n for n in OPCIONES_DEUDORES if n != pagador]
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-    keyboard.append([
-        InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"),
-        InlineKeyboardButton("Otro", callback_data="Otro"),
-        InlineKeyboardButton("Listo", callback_data="Listo")
-    ])
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"👤 Nuevo pagador registrado: *{pagador}*\n\n💸 ¿Quiénes deben pagar?",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=build_deudores_keyboard(pagador, [], show_done=True),
     )
     return DEUDORES
 
@@ -124,11 +119,11 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
     deudores = context.user_data.get("deudores", [])
 
     if data == "Listo":
-        keyboard = [
-            [InlineKeyboardButton("Sí ✅", callback_data="si")],
-            [InlineKeyboardButton("No ❌", callback_data="no")]
-        ]
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="¿El pagador también es deudor?", reply_markup=InlineKeyboardMarkup(keyboard))
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="¿El pagador también es deudor?",
+            reply_markup=build_include_pagador_keyboard(),
+        )
         return INCLUIR_PAGADOR
 
     elif data == "Los 4 de siempre":
@@ -149,30 +144,16 @@ async def recibir_deudores(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             mensaje = f"⚠️ *{data}* ya fue agregado o es el pagador.\n\n"
 
-    nombres_disponibles = [n for n in OPCIONES_DEUDORES if n not in context.user_data.get("deudores", []) and n != pagador]
-
-    grupo_4 = {"Óscar", "Yetro", "Bichos"}
-    ya_elegidos = set(context.user_data.get("deudores", []))
-    mostrar_todos = grupo_4.isdisjoint(ya_elegidos)
-
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_disponibles]
-
-    fila_extra = []
-    if mostrar_todos:
-        fila_extra.append(InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"))
-    fila_extra.append(InlineKeyboardButton("Otro", callback_data="Otro"))
-
-    if not context.user_data.get("primer_pregunta_deudores", True):
-        fila_extra.append(InlineKeyboardButton("Listo", callback_data="Listo"))
-
-    keyboard.append(fila_extra)
-
     mensaje += "Sigue eligiendo deudores o presiona *Listo* para continuar."
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=mensaje,
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=build_deudores_keyboard(
+            pagador,
+            context.user_data.get("deudores", []),
+            show_done=not context.user_data.get("primer_pregunta_deudores", True),
+        ),
     )
     return DEUDORES
 
@@ -190,19 +171,15 @@ async def agregar_deudor_manual(update: Update, context: ContextTypes.DEFAULT_TY
 
     mensaje += "Sigue eligiendo deudores o presiona *Listo* para continuar."
 
-    nombres_faltantes = [n for n in OPCIONES_DEUDORES if n not in context.user_data.get("deudores", [])]
-    keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in nombres_faltantes]
-    keyboard.append([
-        InlineKeyboardButton("Los 4", callback_data="Los 4 de siempre"),
-        InlineKeyboardButton("Otro", callback_data="Otro"),
-        InlineKeyboardButton("Listo", callback_data="Listo")
-    ])
-
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=mensaje,
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=build_deudores_keyboard(
+            context.user_data["pagador"],
+            context.user_data.get("deudores", []),
+            show_done=True,
+        ),
     )
     return DEUDORES
 
@@ -214,9 +191,12 @@ async def incluir_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "si" and pagador not in context.user_data.get("deudores", []):
         context.user_data.setdefault("deudores", []).append(pagador)
 
-    if pagador == "Óscar":
-        keyboard = [[InlineKeyboardButton(m, callback_data=m)] for m in METODOS]
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="🏦 ¿Con qué método pagó Óscar?", reply_markup=InlineKeyboardMarkup(keyboard))
+    if should_ask_payment_method(pagador):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🏦 ¿Con qué método pagó Óscar?",
+            reply_markup=build_payment_method_keyboard(METODOS),
+        )
         return METODO_PAGO
 
     return await mostrar_confirmacion(update, context)
@@ -250,7 +230,7 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    rows = build_expense_rows(
+    movements = build_expense_rows(
         context.user_data.get("descripcion", ""),
         context.user_data.get("monto", 0),
         context.user_data.get("pagador", ""),
@@ -258,7 +238,7 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         now,
         context.user_data.get("metodo_pago", ""),
     )
-    append_rows(rows)
+    append_movements(movements)
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Gasto registrado exitosamente! ✅")
     return ConversationHandler.END

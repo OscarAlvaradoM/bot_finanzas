@@ -2,6 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
+from domain.models import Movement
 from tests.helpers import FakeContext, FakeMessage, FakeUpdate
 
 from handlers.saldo import saldo
@@ -10,14 +11,14 @@ from services.finance_service import build_balance_summary
 
 class SaldoTests(unittest.TestCase):
     def test_saldo_netea_deudas_cruzadas(self):
-        records = [
-            {"Deudor": "Óscar", "Prestador": "Yetro", "Monto": "500"},
-            {"Deudor": "Yetro", "Prestador": "Óscar", "Monto": "200"},
+        movements = [
+            Movement("Cena", 500.0, "Óscar", "Yetro", "2026-03-23 10:00:00"),
+            Movement("Comida", 200.0, "Yetro", "Óscar", "2026-03-23 11:00:00"),
         ]
         message = FakeMessage()
         update = FakeUpdate(message=message)
 
-        with patch("handlers.saldo.fetch_records", return_value=records):
+        with patch("handlers.saldo.fetch_movements", return_value=movements):
             asyncio.run(saldo(update, FakeContext()))
 
         self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
@@ -25,14 +26,14 @@ class SaldoTests(unittest.TestCase):
         self.assertNotIn("Yetro → Óscar", message.replies[1]["text"])
 
     def test_saldo_reduce_deuda_con_pago_negativo(self):
-        records = [
-            {"Deudor": "Óscar", "Prestador": "Yetro", "Monto": "500"},
-            {"Deudor": "Óscar", "Prestador": "Yetro", "Monto": "-150"},
+        movements = [
+            Movement("Cena", 500.0, "Óscar", "Yetro", "2026-03-23 10:00:00"),
+            Movement("Pago", -150.0, "Óscar", "Yetro", "2026-03-23 12:00:00"),
         ]
         message = FakeMessage()
         update = FakeUpdate(message=message)
 
-        with patch("handlers.saldo.fetch_records", return_value=records):
+        with patch("handlers.saldo.fetch_movements", return_value=movements):
             asyncio.run(saldo(update, FakeContext()))
 
         self.assertIn("Óscar → Yetro: $350.0", message.replies[1]["text"])
@@ -40,8 +41,8 @@ class SaldoTests(unittest.TestCase):
     def test_build_balance_summary_muestra_todo_saldado_si_no_hay_deuda(self):
         summary = build_balance_summary(
             [
-                {"Deudor": "Óscar", "Prestador": "Yetro", "Monto": "100"},
-                {"Deudor": "Yetro", "Prestador": "Óscar", "Monto": "100"},
+                Movement("Cena", 100.0, "Óscar", "Yetro", "2026-03-23 10:00:00"),
+                Movement("Pago", 100.0, "Yetro", "Óscar", "2026-03-23 11:00:00"),
             ]
         )
 

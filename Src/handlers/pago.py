@@ -5,7 +5,7 @@ from config import (
     PAGAR_PAGADOR, PAGAR_RECEPTOR, PAGAR_MONTO, PAGAR_CONFIRMAR, PAGAR_PAGADOR_OTRO, PAGAR_RECEPTOR_OTRO
 )
 import datetime
-from repositories.sheets_repository import append_row
+from repositories.sheets_repository import append_movement
 from services.finance_service import build_payment_row, build_payment_summary, parse_amount
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -119,7 +119,7 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     monto = context.user_data["monto"]
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_row(build_payment_row(pagador, receptor, monto, timestamp))
+    append_movement(build_payment_row(pagador, receptor, monto, timestamp))
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="¡Pago registrado exitosamente! ✅")
     return ConversationHandler.END
