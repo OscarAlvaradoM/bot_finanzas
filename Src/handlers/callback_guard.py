@@ -2,7 +2,7 @@ from telegram.ext import ContextTypes
 
 
 async def finish_callback(query, text: str) -> None:
-    await query.edit_message_text(text)
+    await query.edit_message_text(text, parse_mode="Markdown")
 
 
 def was_callback_processed(context: ContextTypes.DEFAULT_TYPE, key: str) -> bool:

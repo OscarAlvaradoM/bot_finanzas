@@ -24,8 +24,8 @@ class GastoTests(unittest.TestCase):
         state = asyncio.run(recibir_pagador(update, context))
 
         self.assertEqual(state, DEUDORES)
-        self.assertEqual(update.callback_query.edits[0]["text"], "✅ Pagó: Óscar")
-        self.assertEqual(bot.sent_messages[0]["text"], "💸 ¿Quiénes deben pagar?")
+        self.assertEqual(update.callback_query.edits[0]["text"], "✅ Pagó: *Óscar*")
+        self.assertEqual(bot.sent_messages[0]["text"], "💸 ¿*Quiénes deben pagar* este gasto?")
 
     def test_mostrar_confirmacion_reparte_por_pesos(self):
         bot = FakeBot()
@@ -82,10 +82,10 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(movements[0].movement_id, movements[1].movement_id)
         self.assertEqual(movements[1].monto, 200.0)
         self.assertEqual(movements[1].deudor, "Fabos")
-        self.assertEqual(context.bot.sent_messages[0]["text"], "¡Gasto registrado exitosamente! ✅")
+        self.assertEqual(context.bot.sent_messages[0]["text"], "✅ *Gasto registrado correctamente.*")
         self.assertEqual(
             update.callback_query.edits[0]["text"],
-            "✅ Gasto registrado. Esta confirmación ya quedó cerrada.",
+            "✅ *Confirmación cerrada.*",
         )
 
     def test_confirmar_gasto_no_registra_dos_veces(self):
@@ -112,7 +112,7 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(mocked_append_movements.call_count, 1)
         self.assertEqual(
             update.callback_query.edits[-1]["text"],
-            "⚠️ Este gasto ya fue registrado anteriormente.",
+            "⚠️ Este gasto *ya había sido registrado*.",
         )
 
     def test_confirmar_gasto_muestra_error_si_falla_persistencia(self):
@@ -134,7 +134,7 @@ class GastoTests(unittest.TestCase):
         self.assertFalse(draft.processed)
         self.assertEqual(
             update.callback_query.edits[-1]["text"],
-            "❌ No pude registrar el gasto. Intenta de nuevo en unos minutos.",
+            "❌ No pude guardar el gasto en este momento.\n\nIntenta de nuevo en unos minutos.",
         )
 
     def test_build_expense_rows_reparte_por_pesos(self):

@@ -38,7 +38,7 @@ class PagoTests(unittest.TestCase):
             state = asyncio.run(pagar(update, context))
 
         self.assertEqual(state, PAGAR_PAGADOR)
-        self.assertEqual(context.bot.sent_messages[0]["text"], "Calculando deudas para mostrar opciones...")
+        self.assertEqual(context.bot.sent_messages[0]["text"], "💸 *Registrar pago*\n\nCalculando deudas para mostrarte opciones...")
         keyboard = context.bot.sent_messages[1]["reply_markup"].keyboard
         labels = [row[0].text for row in keyboard]
         self.assertEqual(labels, ["Óscar", "Otro"])
@@ -71,7 +71,7 @@ class PagoTests(unittest.TestCase):
 
         self.assertEqual(state, PAGAR_DECISION_MONTO)
         self.assertEqual(context.user_data["payment_draft"].deuda_sugerida, 500.0)
-        self.assertIn("un total de $500.00", update.callback_query.edits[0]["text"])
+        self.assertIn("un total de *$500.00*", update.callback_query.edits[0]["text"])
 
     def test_pagar_decidir_monto_liquida_deuda_y_pasa_a_confirmacion(self):
         update = FakeUpdate(callback_query=FakeCallbackQuery("liquidar_deuda"))
@@ -92,7 +92,7 @@ class PagoTests(unittest.TestCase):
         state = asyncio.run(pagar_decidir_monto(update, context))
 
         self.assertEqual(state, PAGAR_MONTO)
-        self.assertIn("¿Cuánto pagó", update.callback_query.edits[0]["text"])
+        self.assertIn("Escribe el *monto que pagó*", update.callback_query.edits[0]["text"])
 
     def test_pagar_confirmar_registra_monto_negativo(self):
         update = FakeUpdate(callback_query=FakeCallbackQuery("confirmar_pago"))
@@ -121,11 +121,11 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(movement.acreedor, "Yetro")
         self.assertEqual(movement.metodo_pago, "")
         self.assertEqual(movement.movement_id, "pago-123")
-        self.assertIn("¡Pago registrado exitosamente! ✅", context.bot.sent_messages[0]["text"])
+        self.assertIn("✅ *Pago registrado correctamente.*", context.bot.sent_messages[0]["text"])
         self.assertIn("Saldo restante", context.bot.sent_messages[0]["text"])
         self.assertEqual(
             update.callback_query.edits[0]["text"],
-            "✅ Pago registrado. Esta confirmación ya quedó cerrada.",
+            "✅ *Confirmación cerrada.*",
         )
 
     def test_pagar_confirmar_no_registra_dos_veces(self):
@@ -153,7 +153,7 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(mocked_append_movement.call_count, 1)
         self.assertEqual(
             update.callback_query.edits[-1]["text"],
-            "⚠️ Este pago ya fue registrado anteriormente.",
+            "⚠️ Este pago *ya había sido registrado*.",
         )
 
     def test_pagar_confirmar_muestra_error_si_falla_persistencia(self):
@@ -176,7 +176,7 @@ class PagoTests(unittest.TestCase):
         self.assertFalse(draft.processed)
         self.assertEqual(
             update.callback_query.edits[-1]["text"],
-            "❌ No pude registrar el pago. Intenta de nuevo en unos minutos.",
+            "❌ No pude guardar el pago en este momento.\n\nIntenta de nuevo en unos minutos.",
         )
 
     def test_build_payment_row_crea_formato_esperado(self):

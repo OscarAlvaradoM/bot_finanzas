@@ -27,7 +27,7 @@ class SaldoTests(unittest.TestCase):
         with patch("handlers.saldo.fetch_movements", return_value=movements):
             asyncio.run(saldo(update, FakeContext()))
 
-        self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
+        self.assertEqual(message.replies[0]["text"], "📊 Calculando saldos...")
         self.assertIn("Óscar: $300.0", message.replies[1]["text"])
         self.assertIn("*Óscar*", message.replies[2]["text"])
         self.assertIn("Debe a Yetro: $300.0", message.replies[2]["text"])
@@ -44,6 +44,7 @@ class SaldoTests(unittest.TestCase):
         with patch("handlers.saldo.fetch_movements", return_value=movements):
             asyncio.run(saldo(update, FakeContext()))
 
+        self.assertEqual(message.replies[0]["text"], "📊 Calculando saldos...")
         self.assertIn("Óscar: $350.0", message.replies[1]["text"])
         self.assertIn("Debe a Yetro: $350.0", message.replies[2]["text"])
 
@@ -88,10 +89,10 @@ class SaldoTests(unittest.TestCase):
         with patch("handlers.saldo.fetch_movements", side_effect=RepositoryError("fallo")):
             asyncio.run(saldo(update, FakeContext()))
 
-        self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
+        self.assertEqual(message.replies[0]["text"], "📊 Calculando saldos...")
         self.assertEqual(
             message.replies[1]["text"],
-            "❌ No pude consultar los saldos en este momento. Intenta de nuevo más tarde.",
+            "❌ No pude consultar los saldos en este momento.\n\nIntenta de nuevo más tarde.",
         )
 
     def test_saldo_muestra_resumen_por_persona_y_detalle(self):
@@ -106,6 +107,6 @@ class SaldoTests(unittest.TestCase):
         with patch("handlers.saldo.fetch_movements", return_value=movements):
             asyncio.run(saldo(update, FakeContext()))
 
-        self.assertEqual(message.replies[0]["text"], "Calculando saldos...")
+        self.assertEqual(message.replies[0]["text"], "📊 Calculando saldos...")
         self.assertIn("Resumen por persona", message.replies[1]["text"])
         self.assertIn("Saldos pendientes por deudor", message.replies[2]["text"])

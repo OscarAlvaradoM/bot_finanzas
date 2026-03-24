@@ -21,18 +21,19 @@ from services.validators import validate_amount_text, validate_required_name
 
 async def pagar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     create_payment_draft(context)
-    await update.message.reply_text("Calculando deudas para mostrar opciones...")
+    await update.message.reply_text("💸 *Registrar pago*\n\nCalculando deudas para mostrarte opciones...", parse_mode="Markdown")
     try:
         movements = fetch_movements()
         opciones = get_people_with_debt(movements)
     except RepositoryError:
-        await update.message.reply_text("❌ No pude consultar las deudas en este momento. Intenta de nuevo más tarde.")
+        await update.message.reply_text("❌ No pude consultar las deudas en este momento.\n\nIntenta de nuevo más tarde.")
         return ConversationHandler.END
 
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in opciones + ["Otro"]]
 
     await update.message.reply_text(
-        "💸 ¿Quién está pagando? Te muestro primero quienes tienen deudas registradas.",
+        "👤 ¿*Quién está pagando*?\n\nPrimero te muestro a quienes tienen deuda registrada.",
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return PAGAR_PAGADOR
@@ -44,7 +45,7 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_payment_draft(context)
 
     if pagador == "Otro":
-        await query.edit_message_text("✍️ Escribe el nombre del pagador:")
+        await query.edit_message_text("✍️ Escribe el *nombre del pagador*.", parse_mode="Markdown")
         return PAGAR_PAGADOR_OTRO
 
     draft.pagador = pagador
@@ -59,7 +60,7 @@ async def pagar_pagador(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in opciones + ["Otro"]]
 
     await query.edit_message_text(
-        f"💳 ¿A quién le está pagando *{pagador}*? Te muestro primero a quienes les debe.",
+        f"💳 ¿A *quién le está pagando* *{pagador}*?\n\nPrimero te muestro a quienes les debe.",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -70,7 +71,7 @@ async def pagar_pagador_otro(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         pagador = validate_required_name(update.message.text)
     except ValueError:
-        await update.message.reply_text("❌ Nombre no válido. Intenta nuevamente.")
+        await update.message.reply_text("❌ Ese nombre no me sirve.\n\nEscríbelo de nuevo, por favor.")
         return PAGAR_PAGADOR_OTRO
     draft.pagador = pagador
 
@@ -83,7 +84,7 @@ async def pagar_pagador_otro(update: Update, context: ContextTypes.DEFAULT_TYPE)
     keyboard = [[InlineKeyboardButton(n, callback_data=n)] for n in opciones + ["Otro"]]
 
     await update.message.reply_text(
-        f"💳 ¿A quién le está pagando *{pagador}*?",
+        f"💳 ¿A *quién le está pagando* *{pagador}*?",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -96,7 +97,7 @@ async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_payment_draft(context)
 
     if receptor == "Otro":
-        await query.edit_message_text("✍️ Escribe el nombre del receptor del pago:")
+        await query.edit_message_text("✍️ Escribe el *nombre del receptor del pago*.", parse_mode="Markdown")
         return PAGAR_RECEPTOR_OTRO
 
     draft.receptor = receptor
@@ -115,14 +116,14 @@ async def pagar_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         )
         await query.edit_message_text(
-            f"💰 *{draft.pagador}* le debe a *{receptor}* un total de ${draft.deuda_sugerida:,.2f}.\n\n¿Qué quieres hacer?",
+            f"💰 *{draft.pagador}* le debe a *{receptor}* un total de *${draft.deuda_sugerida:,.2f}*.\n\n¿Qué quieres hacer?",
             parse_mode="Markdown",
             reply_markup=keyboard,
         )
         return PAGAR_DECISION_MONTO
 
     await query.edit_message_text(
-        f"💰 ¿Cuánto pagó *{draft.pagador}* a *{receptor}*?",
+        f"✍️ Escribe el *monto que pagó* *{draft.pagador}* a *{receptor}*.",
         parse_mode="Markdown"
     )
     return PAGAR_MONTO
@@ -132,13 +133,13 @@ async def pagar_receptor_otro(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         receptor = validate_required_name(update.message.text)
     except ValueError:
-        await update.message.reply_text("❌ Nombre no válido. Intenta nuevamente.")
+        await update.message.reply_text("❌ Ese nombre no me sirve.\n\nEscríbelo de nuevo, por favor.")
         return PAGAR_RECEPTOR_OTRO
     draft.receptor = receptor
     draft.deuda_sugerida = 0.0
 
     await update.message.reply_text(
-        f"💰 ¿Cuánto pagó *{draft.pagador}* a *{receptor}*?",
+        f"✍️ Escribe el *monto que pagó* *{draft.pagador}* a *{receptor}*.",
         parse_mode="Markdown"
     )
     return PAGAR_MONTO
@@ -167,7 +168,7 @@ async def pagar_decidir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE
         return PAGAR_CONFIRMAR
 
     await query.edit_message_text(
-        f"💰 ¿Cuánto pagó *{draft.pagador}* a *{draft.receptor}*?",
+        f"✍️ Escribe el *monto que pagó* *{draft.pagador}* a *{draft.receptor}*.",
         parse_mode="Markdown",
     )
     return PAGAR_MONTO
@@ -177,7 +178,7 @@ async def pagar_monto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         monto = validate_amount_text(update.message.text)
     except ValueError:
-        await update.message.reply_text("Monto inválido. Escribe un número. Ej: 250.00")
+        await update.message.reply_text("⚠️ No entendí ese monto.\n\nEscríbelo como número, por ejemplo: *250.00*", parse_mode="Markdown")
         return PAGAR_MONTO
 
     draft.monto = monto
@@ -206,7 +207,7 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draft = get_payment_draft(context)
 
     if draft.processed:
-        await finish_callback(query, "⚠️ Este pago ya fue registrado anteriormente.")
+        await finish_callback(query, "⚠️ Este pago *ya había sido registrado*.")
         return ConversationHandler.END
 
     draft.processed = True
@@ -224,9 +225,9 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except RepositoryError:
         draft.processed = False
-        await finish_callback(query, "❌ No pude registrar el pago. Intenta de nuevo en unos minutos.")
+        await finish_callback(query, "❌ No pude guardar el pago en este momento.\n\nIntenta de nuevo en unos minutos.")
         return PAGAR_CONFIRMAR
-    await finish_callback(query, "✅ Pago registrado. Esta confirmación ya quedó cerrada.")
+    await finish_callback(query, "✅ *Confirmación cerrada.*")
 
     saldo_restante = None
     try:
@@ -235,16 +236,16 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except RepositoryError:
         saldo_restante = None
 
-    mensaje = "¡Pago registrado exitosamente! ✅"
+    mensaje = "✅ *Pago registrado correctamente.*"
     if saldo_restante is not None:
-        mensaje += f"\nSaldo restante de {draft.pagador} con {draft.receptor}: ${saldo_restante:,.2f}"
+        mensaje += f"\n\n*Saldo restante* de *{draft.pagador}* con *{draft.receptor}*: *${saldo_restante:,.2f}*"
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=mensaje)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=mensaje, parse_mode="Markdown")
     return ConversationHandler.END
 
 
 async def pagar_cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("❌ Operación cancelada.")
+    await query.edit_message_text("❌ *Listo, cancelé esta operación.*", parse_mode="Markdown")
     return ConversationHandler.END

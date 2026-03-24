@@ -4,9 +4,9 @@ from telegram.ext import ContextTypes, ConversationHandler
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     if update.message:
-        await update.message.reply_text("❌ Operación cancelada.")
+        await update.message.reply_text("❌ *Listo, cancelé esta operación.*", parse_mode="Markdown")
     else:
         q = update.callback_query
         await q.answer()
-        await q.edit_message_text("❌ Operación cancelada.")
+        await q.edit_message_text("❌ *Listo, cancelé esta operación.*", parse_mode="Markdown")
     return ConversationHandler.END
