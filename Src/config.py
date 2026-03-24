@@ -19,9 +19,10 @@ NOMBRE_PAGADOR_MANUAL = 99
     PAGAR_PAGADOR_OTRO,
     PAGAR_RECEPTOR,
     PAGAR_RECEPTOR_OTRO,
+    PAGAR_DECISION_MONTO,
     PAGAR_MONTO,
     PAGAR_CONFIRMAR,
-) = range(100,106)
+) = range(100,107)
 
 # Constantes
 OPCIONES_PAGADORES = ["Óscar", "Yetro", "Judith", "Bichos", "Fabos"]

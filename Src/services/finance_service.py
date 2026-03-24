@@ -141,3 +141,29 @@ def build_balance_summary(movements: list[Movement]) -> str:
         return "🎉 ¡Todo está saldado!"
 
     return resumen
+
+
+def get_net_balances(movements: list[Movement]) -> dict[str, dict[str, float]]:
+    balance = build_balance_map(movements)
+    net_balances: dict[str, dict[str, float]] = {}
+
+    for deudor, acreedores in balance.items():
+        for acreedor, monto in acreedores.items():
+            contraparte = balance.get(acreedor, {}).get(deudor, 0)
+            neto = round(monto - contraparte, 2)
+            if neto > 0:
+                net_balances.setdefault(deudor, {})[acreedor] = neto
+
+    return net_balances
+
+
+def get_people_with_debt(movements: list[Movement]) -> list[str]:
+    return sorted(get_net_balances(movements).keys())
+
+
+def get_creditors_for_debtor(movements: list[Movement], deudor: str) -> list[str]:
+    return sorted(get_net_balances(movements).get(deudor, {}).keys())
+
+
+def get_debt_amount(movements: list[Movement], deudor: str, acreedor: str) -> float:
+    return get_net_balances(movements).get(deudor, {}).get(acreedor, 0.0)

@@ -90,5 +90,6 @@ class PaymentDraft:
     pagador: str = ""
     receptor: str = ""
     monto: float = 0.0
+    deuda_sugerida: float = 0.0
     movement_id: str = ""
     processed: bool = False
