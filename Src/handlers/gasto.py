@@ -286,10 +286,18 @@ async def confirmar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CONFIRMACION
 
     await finish_callback(query, "✅ *Confirmación cerrada.*")
+    resumen_final = build_expense_summary(
+        draft.descripcion,
+        draft.monto,
+        draft.pagador,
+        draft.deudores,
+        draft.metodo_pago or None,
+    )
+    resumen_final = resumen_final.replace("📌", "🧾 *Gasto registrado correctamente*\n\n📌", 1)
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="✅ *Gasto registrado correctamente.*",
+        text=resumen_final,
         parse_mode="Markdown",
     )
     return ConversationHandler.END

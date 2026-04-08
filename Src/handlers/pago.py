@@ -241,7 +241,9 @@ async def pagar_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except RepositoryError:
         balance_entre_personas = None
 
-    mensaje = "✅ *Pago registrado correctamente.*"
+    mensaje = build_payment_summary(draft.pagador, draft.receptor, draft.monto)
+    mensaje = mensaje.replace("📌 *Confirmar pago*", "💸 *Pago registrado correctamente*", 1)
+    mensaje = mensaje.replace("\n\n¿Registrar este pago?", "", 1)
     if balance_entre_personas is not None:
         if balance_entre_personas > 0:
             mensaje += (
