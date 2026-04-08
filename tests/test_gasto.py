@@ -138,7 +138,11 @@ class GastoTests(unittest.TestCase):
         self.assertEqual(movements[0].movement_id, movements[1].movement_id)
         self.assertEqual(movements[1].monto, 200.0)
         self.assertEqual(movements[1].deudor, "Fabos")
-        self.assertEqual(context.bot.sent_messages[0]["text"], "✅ *Gasto registrado correctamente.*")
+        self.assertIn("🧾 *Gasto registrado correctamente*", context.bot.sent_messages[0]["text"])
+        self.assertIn("📌 *Super*", context.bot.sent_messages[0]["text"])
+        self.assertIn("💰 Monto total: $300.00", context.bot.sent_messages[0]["text"])
+        self.assertIn("• Yetro paga $100.00", context.bot.sent_messages[0]["text"])
+        self.assertIn("• Fabos paga $200.00", context.bot.sent_messages[0]["text"])
         self.assertEqual(
             update.callback_query.edits[0]["text"],
             "✅ *Confirmación cerrada.*",

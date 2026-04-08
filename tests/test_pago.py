@@ -139,7 +139,10 @@ class PagoTests(unittest.TestCase):
         self.assertEqual(movement.acreedor, "Yetro")
         self.assertEqual(movement.metodo_pago, "")
         self.assertEqual(movement.movement_id, "pago-123")
-        self.assertIn("✅ *Pago registrado correctamente.*", context.bot.sent_messages[0]["text"])
+        self.assertIn("💸 *Pago registrado correctamente*", context.bot.sent_messages[0]["text"])
+        self.assertIn("👤 Pagador: Óscar", context.bot.sent_messages[0]["text"])
+        self.assertIn("➡️ Receptor: Yetro", context.bot.sent_messages[0]["text"])
+        self.assertIn("💵 Monto: $250.00", context.bot.sent_messages[0]["text"])
         self.assertIn("Saldo restante", context.bot.sent_messages[0]["text"])
         self.assertEqual(
             update.callback_query.edits[0]["text"],
